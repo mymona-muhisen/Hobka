@@ -6,6 +6,7 @@ import { sameOrigin } from '../../../lib/auth';
 import { statuses, waLink, toIntl, type Status, type ChildInput } from '../../../lib/order';
 import { boxes, items, governorates, storyValues, artStyles, payment, timing, photoRetentionDays, type ItemId } from '../../../config/catalog';
 import { money } from '../../../lib/pricing';
+import { sanitizeImage } from '../../../lib/image';
 
 export const prerender = false;
 
@@ -43,7 +44,9 @@ if (Astro.request.method === 'POST') {
       const version = o.draft_version + 1;
       for (let i = 0; i < files.length; i++) {
         if (files[i].size > 3 * 1024 * 1024) throw new Error(`الصفحة ${i + 1} أكبر من 3 ميغابايت.`);
-        await env.PHOTOS.put(`draft:${o.code}:v${version}:${i}`, await files[i].arrayBuffer(), { expirationTtl: DRAFT_TTL, metadata: { type: files[i].type || 'image/jpeg' } });
+        const clean = sanitizeImage(await files[i].arrayBuffer());
+        if (!clean) throw new Error(`الصفحة ${i + 1} ليست صورة سليمة (JPG أو PNG أو WebP).`);
+        await env.PHOTOS.put(`draft:${o.code}:v${version}:${i}`, clean.buf, { expirationTtl: DRAFT_TTL, metadata: { type: clean.type } });
       }
       await d.prepare("UPDATE orders SET draft_url = ?, draft_message = ?, draft_version = ?, status = 'draft_sent', updated_at = ? WHERE id = ?").bind(url || null, msg || null, version, t, o.id).run();
       if (files.length) await logEvent(o.id, 'admin', 'draft_images', `${version}:${files.length}`);

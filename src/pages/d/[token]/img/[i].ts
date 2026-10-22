@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { db, env, type OrderRow } from '../../../../lib/db';
+import { imageHeaders } from '../../../../lib/image';
 
 export const prerender = false;
 
@@ -13,5 +14,5 @@ export const GET: APIRoute = async ({ params }) => {
   if (!order) return new Response('Not found', { status: 404 });
   const { value, metadata } = await env.PHOTOS.getWithMetadata<{ type: string }>(`draft:${order.code}:v${v}:${i}`, 'arrayBuffer');
   if (!value) return new Response('Not found', { status: 404 });
-  return new Response(value, { headers: { 'content-type': metadata?.type ?? 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
+  return new Response(value, { headers: imageHeaders(metadata?.type ?? 'image/jpeg', 'private, max-age=86400') });
 };

@@ -5,18 +5,12 @@ import { findDiscount } from '../../lib/discount';
 import { db, env, now, logEvent, rateLimit } from '../../lib/db';
 import { clientKey } from '../../lib/auth';
 import { contact, maxPhotos, photoRetentionDays } from '../../config/catalog';
+import { sanitizeImage } from '../../lib/image';
 
 export const prerender = false;
 
 const MAX_PHOTO = 4 * 1024 * 1024;
 const fail = (status: number, error: string, details?: unknown) => Response.json({ ok: false, error, details }, { status });
-
-function imageType(buf: Uint8Array): string | null {
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
-  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45) return 'image/webp';
-  return null;
-}
 
 export const POST: APIRoute = async ({ request }) => {
   if (!(await rateLimit('order:' + (await clientKey(request)), 8, 3600))) return fail(429, 'rate_limited');
@@ -38,10 +32,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (!files.length) return fail(422, 'photo_missing');
     for (const f of files.slice(0, maxPhotos)) {
       if (f.size > MAX_PHOTO) return fail(413, 'photo_too_large');
-      const buf = await f.arrayBuffer();
-      const type = imageType(new Uint8Array(buf.slice(0, 12)));
-      if (!type) return fail(415, 'photo_type');
-      photos.push({ buf, type });
+      // Structural check + metadata strip + cut anything appended after the image's end marker.
+      const clean = sanitizeImage(await f.arrayBuffer());
+      if (!clean) return fail(415, 'photo_type');
+      photos.push({ buf: clean.buf, type: clean.type });
     }
   }
 

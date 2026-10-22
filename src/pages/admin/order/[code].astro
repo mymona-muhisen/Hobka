@@ -1,0 +1,291 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import Icon from '../../../components/Icon.astro';
+import { db, env, now, logEvent, type OrderRow } from '../../../lib/db';
+import { sameOrigin } from '../../../lib/auth';
+import { statuses, waLink, toIntl, type Status, type ChildInput } from '../../../lib/order';
+import { boxes, items, governorates, storyValues, artStyles, payment, timing, photoRetentionDays, type ItemId } from '../../../config/catalog';
+import { money } from '../../../lib/pricing';
+
+export const prerender = false;
+
+const code = String(Astro.params.code ?? '').toUpperCase();
+const d = await db();
+const load = () => d.prepare('SELECT * FROM orders WHERE code = ?').bind(code).first<OrderRow>();
+let order = await load();
+if (!order) return new Response('الطلب غير موجود', { status: 404 });
+
+const DRAFT_TTL = 120 * 24 * 3600;
+let flash = Astro.url.searchParams.get('ok') ?? '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  const form = await Astro.request.formData();
+  const action = String(form.get('action') ?? '');
+  const t = now();
+  const o = order;
+  try {
+    if (action === 'status') {
+      const s = String(form.get('status') ?? '');
+      if (!(s in statuses)) throw new Error('حالة غير معروفة');
+      await d.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?').bind(s, t, o.id).run();
+      await logEvent(o.id, 'admin', 'status', s);
+    } else if (action === 'notes') {
+      await d.prepare('UPDATE orders SET admin_notes = ?, updated_at = ? WHERE id = ?').bind(String(form.get('admin_notes') ?? '').slice(0, 4000), t, o.id).run();
+    } else if (action === 'draft') {
+      const url = String(form.get('draft_url') ?? '').trim();
+      if (url && !/^https:\/\//.test(url)) throw new Error('رابط المسودة يجب أن يبدأ بـ https://');
+      const msg = String(form.get('draft_message') ?? '').trim().slice(0, 2000);
+      const files = form.getAll('pages').filter((f): f is File => typeof f === 'object' && f !== null && 'arrayBuffer' in f && (f as File).size > 0);
+      if (!url && !files.length) throw new Error('أضيفي رابط المسودة أو صور الصفحات.');
+      if (files.length > 60) throw new Error('الحد الأقصى 60 صفحة.');
+      const version = o.draft_version + 1;
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].size > 3 * 1024 * 1024) throw new Error(`الصفحة ${i + 1} أكبر من 3 ميغابايت.`);
+        await env.PHOTOS.put(`draft:${o.code}:v${version}:${i}`, await files[i].arrayBuffer(), { expirationTtl: DRAFT_TTL, metadata: { type: files[i].type || 'image/jpeg' } });
+      }
+      await d.prepare("UPDATE orders SET draft_url = ?, draft_message = ?, draft_version = ?, status = 'draft_sent', updated_at = ? WHERE id = ?").bind(url || null, msg || null, version, t, o.id).run();
+      if (files.length) await logEvent(o.id, 'admin', 'draft_images', `${version}:${files.length}`);
+      await logEvent(o.id, 'admin', 'draft_sent', `نسخة ${version}`);
+    } else if (action === 'delete_photos') {
+      for (let i = 0; i < 10; i++) await env.PHOTOS.delete(`photo:${o.code}:${i}`);
+      await d.prepare('UPDATE orders SET photo_count = 0, updated_at = ? WHERE id = ?').bind(t, o.id).run();
+      await logEvent(o.id, 'admin', 'photos_deleted', null);
+    } else {
+      throw new Error('إجراء غير معروف');
+    }
+    return Astro.redirect(`/admin/order/${o.code}?ok=${encodeURIComponent('تم الحفظ ✓')}`, 303);
+  } catch (e) {
+    error = (e as Error).message;
+    order = (await load())!;
+  }
+}
+
+const o = order!;
+const lang = o.site_lang === 'en' ? 'en' : 'ar';
+const child = o.child ? (JSON.parse(o.child) as ChildInput) : null;
+const addons = JSON.parse(o.addons) as ItemId[];
+const box = boxes.find((b) => b.id === o.box);
+const gov = governorates.find((g) => g.id === o.governorate);
+const { results: events } = await d.prepare('SELECT * FROM order_events WHERE order_id = ? ORDER BY id DESC LIMIT 50').bind(o.id).all<{ at: string; actor: string; type: string; note: string | null }>();
+const draftLink = `${Astro.url.origin}/d/${o.token}`;
+const phoneIntl = toIntl(o.phone);
+const fmt = (iso: string) => new Date(iso).toLocaleString('ar-SY', { timeZone: 'Asia/Damascus', dateStyle: 'medium', timeStyle: 'short' });
+const created = Date.parse(o.created_at);
+const photosExpire = new Date(created + photoRetentionDays * 86400000);
+
+const msgs = lang === 'en'
+  ? {
+      confirm: `Hello ${o.parent_name} 🌸\nWe received your order ${o.code} ✅\nWe're preparing the free draft and will send it within ${timing.draftDays.en}.`,
+      draft: `Hello ${o.parent_name} 🌸\n${child ? `${child.name}'s story draft is ready!` : 'Your draft is ready!'}\nReview it here, then approve it or write your notes:\n${draftLink}`,
+      pay: `Thank you for approving the draft 💛\nOrder ${o.code}\nTotal: ${money(o.total, 'en')}\n${payment.instructions.en}\nWe start printing as soon as payment arrives.`,
+      shipped: `Good news! Order ${o.code} is on its way to you 📦`,
+    }
+  : {
+      confirm: `مرحباً ${o.parent_name} 🌸\nوصلنا طلبك ${o.code} ✅\nنجهّز المسودة المجانية وسنرسلها لك خلال ${timing.draftDays.ar}.`,
+      draft: `مرحباً ${o.parent_name} 🌸\n${child ? `مسودة قصة ${child.name} جاهزة!` : 'المسودة جاهزة!'}\nراجعها من هنا، ثم اعتمدها أو اكتب ملاحظاتك:\n${draftLink}`,
+      pay: `شكراً لاعتماد المسودة 💛\nالطلب ${o.code}\nالمبلغ: ${money(o.total, 'ar')}\n${payment.instructions.ar}\nنبدأ الطباعة فور وصول الدفعة.`,
+      shipped: `خبر جميل! طلبك ${o.code} في الطريق إليك 📦`,
+    };
+const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', status: 'تغيير الحالة', draft_sent: 'أُرسلت المسودة', draft_images: 'صفحات المسودة', approved: 'اعتمد العميل المسودة', changes_requested: 'طلب العميل تعديلات', photos_deleted: 'حُذفت الصور' };
+---
+<Admin title={o.code}>
+  <p><a href="/admin">→ كل الطلبات</a></p>
+  {flash && <p class="flash">{flash}</p>}
+  {error && <p class="flash bad" role="alert">{error}</p>}
+
+  <div class="head">
+    <h1 class="ltr">{o.code}</h1>
+    <span class={`st st-${o.status}`}>{statuses[o.status as Status]?.ar}</span>
+    <span class="muted">{fmt(o.created_at)} · لغة الموقع: {lang === 'en' ? 'إنجليزي' : 'عربي'}</span>
+  </div>
+
+  <div class="grid">
+    <div>
+      {o.feedback && (
+        <section class="apanel fb">
+          <h2>{o.status === 'changes_requested' ? '✏️ ملاحظات العميل على المسودة' : '💬 ملاحظة العميل'}</h2>
+          <p class="pre">{o.feedback}</p>
+        </section>
+      )}
+
+      {child && (
+        <section class="apanel">
+          <h2>الطفل والقصة</h2>
+          <dl class="kv">
+            <dt>الاسم</dt><dd><strong>{child.name}</strong></dd>
+            <dt>الجنس والعمر</dt><dd>{child.gender === 'girl' ? 'بنت' : 'ولد'} · {child.age} سنوات</dd>
+            <dt>لغة القصة</dt><dd>{child.storyLang === 'en' ? 'الإنجليزية' : 'العربية'}</dd>
+            {child.values.length > 0 && <><dt>القيم</dt><dd>{child.values.map((v) => storyValues.find((x) => x.id === v)?.name.ar ?? v).join('، ')}</dd></>}
+            {child.valueNote && <><dt>ملاحظة القيمة</dt><dd class="pre">{child.valueNote}</dd></>}
+            {child.ownIdea && <><dt>فكرة الأهل</dt><dd class="pre">{child.ownIdea}</dd></>}
+            {child.appearance && <><dt>الشكل</dt><dd class="pre">{child.appearance}</dd></>}
+            {child.interests && <><dt>يحب</dt><dd>{child.interests}</dd></>}
+            {child.style && <><dt>الأسلوب</dt><dd>{artStyles.find((s) => s.id === child.style)?.name.ar}</dd></>}
+          </dl>
+        </section>
+      )}
+
+      {o.kind === 'box' && (
+        <section class="apanel">
+          <h2>صور الطفل</h2>
+          {o.photo_count > 0 ? (
+            <>
+              <div class="photos">
+                {Array.from({ length: o.photo_count }, (_, i) => <a href={`/admin/photo/${o.code}/${i}`} target="_blank"><img src={`/admin/photo/${o.code}/${i}`} alt={`صورة ${i + 1}`} /></a>)}
+              </div>
+              <p class="muted">تُحذف تلقائياً في {photosExpire.toLocaleDateString('ar-SY', { timeZone: 'Asia/Damascus' })}. موافقة ولي الأمر: {o.photo_consent ? 'نعم ✓' : 'لا'}</p>
+              <form method="post" onsubmit="return confirm('حذف صور الطفل نهائياً؟')">
+                <input type="hidden" name="action" value="delete_photos" />
+                <button class="abtn danger" type="submit">احذف الصور الآن</button>
+              </form>
+            </>
+          ) : (
+            <p class="muted">{o.photo_mode === 'whatsapp' ? 'سيرسل الأهل الصورة على واتساب.' : o.photo_mode === 'none' ? 'بدون صورة (الوصف فقط).' : 'لا توجد صور (حُذفت أو انتهت مدتها).'}</p>
+          )}
+        </section>
+      )}
+
+      <section class="apanel">
+        <h2>المسودة</h2>
+        {o.draft_version > 0 && <p class="muted">النسخة الحالية: {o.draft_version}</p>}
+        <form method="post" enctype="multipart/form-data" id="draft-form">
+          <input type="hidden" name="action" value="draft" />
+          <div class="afield">
+            <label for="du">رابط المسودة (اختياري، مثل PDF على Google Drive)</label>
+            <input id="du" name="draft_url" type="url" dir="ltr" value={o.draft_url ?? ''} placeholder="https://" />
+          </div>
+          <div class="afield">
+            <label for="dp">صور صفحات المسودة (اختياري، تُصغَّر تلقائياً)</label>
+            <input id="dp" name="pages" type="file" accept="image/*" multiple />
+          </div>
+          <div class="afield">
+            <label for="dm">رسالة تظهر للأهل فوق المسودة (اختياري)</label>
+            <textarea id="dm" name="draft_message" rows="2">{o.draft_message ?? ''}</textarea>
+          </div>
+          <button class="abtn primary" type="submit">احفظ المسودة واجعل الحالة «جاهزة للمراجعة»</button>
+          <p class="muted" id="draft-progress" aria-live="polite"></p>
+        </form>
+        <p class="link">رابط صفحة المسودة الخاص: <a href={draftLink} target="_blank" class="ltr">/d/{o.token.slice(0, 8)}…</a></p>
+      </section>
+    </div>
+
+    <div>
+      <section class="apanel">
+        <h2>تواصل سريع على واتساب</h2>
+        <div class="wa-list">
+          <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.confirm)}><Icon name="chat" />تأكيد استلام الطلب</a>
+          <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.draft)}><Icon name="chat" />إرسال رابط المسودة</a>
+          <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.pay)}><Icon name="chat" />إرسال تفاصيل الدفع</a>
+          <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.shipped)}><Icon name="chat" />تم الشحن</a>
+          <a class="abtn" target="_blank" rel="noopener" href={`https://wa.me/${phoneIntl}`}>محادثة فارغة</a>
+        </div>
+      </section>
+
+      <section class="apanel">
+        <h2>الحالة</h2>
+        <form method="post" class="row">
+          <input type="hidden" name="action" value="status" />
+          <select name="status" aria-label="الحالة">
+            {Object.entries(statuses).map(([k, v]) => <option value={k} selected={o.status === k}>{v.ar}</option>)}
+          </select>
+          <button class="abtn primary" type="submit">حفظ</button>
+        </form>
+      </section>
+
+      <section class="apanel">
+        <h2>الطلب والمبلغ</h2>
+        <ul class="lines">
+          {box && <li><span>{box.name.ar}</span><span>{money(box.price)}</span></li>}
+          {addons.map((a) => <li><span>{items[a]?.name.ar ?? a}</span><span>{money(items[a]?.addonPrice ?? 0)}</span></li>)}
+          <li><span>الشحن ({gov?.name.ar})</span><span>{money(o.shipping)}</span></li>
+          {o.discount > 0 && <li><span>خصم <span class="ltr">{o.discount_code}</span></span><span>−{money(o.discount)}</span></li>}
+          <li class="total"><span>المجموع</span><span>{money(o.total)}</span></li>
+        </ul>
+        <p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب.</p>
+      </section>
+
+      <section class="apanel">
+        <h2>ولي الأمر والتوصيل</h2>
+        <dl class="kv">
+          <dt>الاسم</dt><dd>{o.parent_name}</dd>
+          <dt>الهاتف</dt><dd class="ltr"><a href={`tel:${o.phone}`}>{o.phone}</a></dd>
+          <dt>المحافظة</dt><dd>{gov?.name.ar}</dd>
+          <dt>العنوان</dt><dd class="pre">{o.address}</dd>
+          {o.notes && <><dt>ملاحظات</dt><dd class="pre">{o.notes}</dd></>}
+        </dl>
+      </section>
+
+      <section class="apanel">
+        <h2>ملاحظاتي الداخلية</h2>
+        <form method="post">
+          <input type="hidden" name="action" value="notes" />
+          <textarea name="admin_notes" rows="3" class="full" aria-label="ملاحظات داخلية">{o.admin_notes ?? ''}</textarea>
+          <button class="abtn" type="submit">حفظ الملاحظات</button>
+        </form>
+      </section>
+
+      <section class="apanel">
+        <h2>السجل</h2>
+        <ol class="events">
+          {events.map((e) => <li><span class="muted">{fmt(e.at)}</span> {eventLabel[e.type] ?? e.type}{e.type === 'status' && e.note ? `: ${statuses[e.note as Status]?.ar ?? e.note}` : e.note && e.type !== 'draft_images' ? `: ${e.note}` : ''}</li>)}
+        </ol>
+      </section>
+    </div>
+  </div>
+</Admin>
+
+<script>
+  // Shrink draft page images in the browser before upload (keeps each under KV/Worker limits).
+  const form = document.getElementById('draft-form') as HTMLFormElement | null;
+  form?.addEventListener('submit', async (e) => {
+    const input = form.querySelector<HTMLInputElement>('input[name="pages"]')!;
+    if (!input.files?.length) return;
+    e.preventDefault();
+    const prog = document.getElementById('draft-progress')!;
+    const btn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    btn.disabled = true;
+    const fd = new FormData();
+    for (const [k, v] of new FormData(form).entries()) if (k !== 'pages') fd.append(k, v);
+    const files = Array.from(input.files).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    for (let i = 0; i < files.length; i++) {
+      prog.textContent = `نجهّز الصفحة ${i + 1} من ${files.length}…`;
+      const bmp = await createImageBitmap(files[i]);
+      const s = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+      c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+      const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), 'image/jpeg', 0.84));
+      fd.append('pages', blob, `p${String(i).padStart(3, '0')}.jpg`);
+    }
+    prog.textContent = 'نرفع المسودة…';
+    const r = await fetch(location.pathname, { method: 'POST', body: fd });
+    location.href = r.url || location.pathname;
+  });
+</script>
+
+<style>
+  .head { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .head h1 { margin: 0; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+  .grid > div { min-width: 0; }
+  .kv { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.4rem 0.75rem; margin: 0; }
+  .kv dt { color: var(--color-muted); font-weight: 600; }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .pre { white-space: pre-line; }
+  .photos { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .photos img { width: 120px; height: 120px; object-fit: cover; border-radius: 12px; }
+  .wa-list { display: grid; gap: 0.5rem; }
+  .row { display: flex; gap: 0.5rem; }
+  .row select { flex: 1; font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); }
+  .lines { list-style: none; padding: 0; margin: 0 0 0.5rem; display: grid; gap: 0.3rem; }
+  .lines li { display: flex; justify-content: space-between; gap: 1rem; }
+  .lines .total { font-weight: 800; border-top: 1px solid var(--color-border); padding-top: 0.4rem; }
+  .full { width: 100%; font: inherit; padding: 0.6rem; border-radius: 12px; border: 1.5px solid var(--color-border); margin-bottom: 0.5rem; }
+  .events { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.35rem; font-size: 0.92rem; }
+  .fb { border: 2px solid #ffcf8a; }
+  .link { margin-top: 0.75rem; font-size: 0.92rem; }
+  .small { font-size: 0.85rem; }
+  @media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

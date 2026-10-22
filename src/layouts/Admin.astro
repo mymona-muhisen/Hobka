@@ -1,0 +1,62 @@
+---
+import '../styles/global.css';
+import Logo from '../components/Logo.astro';
+interface Props { title: string; nav?: boolean }
+const { title, nav = true } = Astro.props;
+const p = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} | إدارة حبكة</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="admin">
+    {nav && (
+      <header class="abar">
+        <a href="/admin" class="alogo"><Logo label="Hobka" /></a>
+        <nav>
+          <a href="/admin" aria-current={p === '/admin' || p.startsWith('/admin/order') ? 'page' : undefined}>الطلبات</a>
+          <a href="/admin/discounts" aria-current={p.startsWith('/admin/discounts') ? 'page' : undefined}>أكواد الخصم</a>
+          <a href="/" target="_blank">الموقع</a>
+          <form method="post" action="/admin/logout"><button type="submit">خروج</button></form>
+        </nav>
+      </header>
+    )}
+    <main class="amain"><slot /></main>
+  </body>
+</html>
+<style is:global>
+  body.admin { background: #f7f2ef; font-size: 1rem; }
+  .abar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1rem; background: #fff; border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
+  .alogo { width: 82px; display: block; }
+  .abar nav { display: flex; gap: 0.25rem 1rem; align-items: center; margin-inline-start: auto; flex-wrap: wrap; }
+  .abar nav a { color: var(--color-ink); text-decoration: none; font-weight: 600; padding: 0.3rem 0.2rem; }
+  .abar nav a[aria-current='page'] { color: var(--color-brand); border-bottom: 2px solid var(--color-brand); }
+  .abar form { margin: 0; }
+  .abar button { font: inherit; background: none; border: 1px solid var(--color-border); border-radius: 99px; padding: 0.2rem 0.8rem; cursor: pointer; }
+  .amain { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+  .amain h1 { font-size: 1.6rem; }
+  .apanel { background: #fff; border-radius: 16px; box-shadow: var(--shadow-card); padding: 1.25rem; margin-bottom: 1rem; }
+  .apanel h2 { font-family: var(--font-body); font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem; }
+  .afield { display: grid; gap: 0.3rem; margin-bottom: 0.9rem; }
+  .afield label { font-weight: 700; }
+  .afield input, .afield select, .afield textarea { font: inherit; padding: 0.6rem 0.8rem; border: 1.5px solid var(--color-border); border-radius: 12px; background: var(--color-paper); width: 100%; }
+  .flash { padding: 0.75rem 1rem; border-radius: 12px; margin-bottom: 1rem; background: #e3f2e9; color: #1b5a39; font-weight: 600; }
+  .flash.bad { background: #fdecee; color: var(--color-error); }
+  .st { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 99px; font-size: 0.85rem; font-weight: 700; background: var(--color-rose); color: var(--color-brand-dark); white-space: nowrap; }
+  .st-new, .st-changes_requested { background: #ffe2b8; color: #7a4100; }
+  .st-approved { background: #dbeafe; color: #1e3a8a; }
+  .st-paid, .st-printing, .st-shipped { background: #e3f2e9; color: #1b5a39; }
+  .st-delivered { background: #eee; color: #444; }
+  .st-cancelled { background: #f3f3f3; color: #888; text-decoration: line-through; }
+  .abtn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 44px; padding: 0 1.1rem; border-radius: 99px; border: 1.5px solid var(--color-brand); background: #fff; color: var(--color-brand-dark); font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+  .abtn { max-width: 100%; text-align: center; padding-block: 0.4rem; line-height: 1.4; }
+  .abtn.primary { background: var(--color-brand); color: #fff; }
+  .abtn.wa { background: #1f7a4d; border-color: #1f7a4d; color: #fff; }
+  .abtn.danger { border-color: var(--color-error); color: var(--color-error); }
+  .abtn svg { width: 18px; height: 18px; }
+</style>

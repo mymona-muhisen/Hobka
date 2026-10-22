@@ -1,0 +1,15 @@
+---
+interface Props { title: string; updated?: string; lang: 'ar' | 'en' }
+const { title, updated, lang } = Astro.props;
+---
+<article class="prose container">
+  <h1>{title}</h1>
+  {updated && <p class="muted">{lang === 'ar' ? 'آخر تحديث: ' : 'Last updated: '}{updated}</p>}
+  <slot />
+</article>
+<style>
+  .prose { max-width: 780px; padding-block: var(--space-12) var(--space-16); }
+  .prose :global(h2) { font-size: 1.45rem; margin-top: var(--space-8); }
+  .prose :global(ul) { padding-inline-start: 1.4rem; }
+  .prose :global(li) { margin-bottom: var(--space-2); }
+</style>

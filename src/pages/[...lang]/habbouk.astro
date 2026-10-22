@@ -1,0 +1,76 @@
+---
+import Base from '../../layouts/Base.astro';
+import Icon from '../../components/Icon.astro';
+import { contact, items, type Lang } from '../../config/catalog';
+import { path } from '../../i18n/ui';
+export function getStaticPaths() { return [{ params: { lang: undefined } }, { params: { lang: 'en' } }]; }
+const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const ar = lang === 'ar';
+const T = ar
+  ? {
+      title: 'حبّوك | حبكة', h1: 'هذا حبّوك', lead: 'صديق طفلك الذي خرج من صفحات حبكة: فضولي ودافئ ومرح، يحب المغامرات الصغيرة، ويشبه أخاً كبيراً لطيفاً أكثر من أي بطل خارق.',
+      where: 'أين يرافق حبّوك طفلك؟', ar: 'التقط صورة مع حبّوك', arText: 'افتح الكاميرا على هاتفك، استمع لتحية حبّوك، اختر حركته المفضلة، ثم التقط صورة معه وشاركها. لا تحتاج تطبيقاً، والصورة تُصنع على هاتفك فقط.',
+      arCta: 'افتح الكاميرا مع حبّوك', steps: ['افتح الرابط على هاتفك', 'اسمح باستخدام الكاميرا', 'اختر حركة حبّوك والتقط الصورة'], order: 'اطلب قصة لطفلك',
+      alt: 'حبّوك يلوّح بيده',
+    }
+  : {
+      title: 'Habbouk | Hobka', h1: 'This is Habbouk', lead: 'Your child’s friend who stepped out of Hobka’s pages: curious, warm and playful, loves small adventures, and feels more like a kind big brother than a superhero.',
+      where: 'Where does Habbouk join your child?', ar: 'Take a photo with Habbouk', arText: 'Open the camera on your phone, hear Habbouk’s greeting, pick his favorite move, then take a photo with him and share it. No app needed, and the photo is made on your phone only.',
+      arCta: 'Open the camera with Habbouk', steps: ['Open the link on your phone', 'Allow the camera', 'Pick Habbouk’s move and take the photo'], order: 'Order a story',
+      alt: 'Habbouk waving',
+    };
+const with_ = [items.stickers, items.cards, items.planting, items.figure3d, items.newspaper];
+---
+<Base lang={lang} title={T.title} description={T.lead} altPath={ar ? '/en/habbouk' : '/habbouk'}>
+  <section class="hb container">
+    <div class="intro">
+      <img src="/images/habbouk.webp" width="282" height="460" alt={T.alt} class="hb-img" fetchpriority="high" />
+      <div>
+        <h1>{T.h1}</h1>
+        <p class="lead">{T.lead}</p>
+      </div>
+    </div>
+
+    <h2>{T.where}</h2>
+    <ul class="where">
+      {with_.map((it) => (
+        <li>
+          <h3>{it.name[lang]} {it.status === 'soon' && <span class="badge badge-soon">{ar ? 'قريباً' : 'soon'}</span>}</h3>
+          <p class="muted">{it.desc[lang]}</p>
+        </li>
+      ))}
+    </ul>
+
+    <div class="ar card">
+      <div>
+        <h2>{T.ar}</h2>
+        <p>{T.arText}</p>
+        <ol>{T.steps.map((s) => <li>{s}</li>)}</ol>
+        <div class="actions">
+          <a class="btn btn-primary" href={contact.arUrl} target="_blank" rel="noopener"><Icon name="camera" />{T.arCta}</a>
+          <a class="btn btn-secondary" href={path(lang, '/order')}>{T.order}</a>
+        </div>
+      </div>
+      <Icon name="phone" class="phone" />
+    </div>
+  </section>
+</Base>
+<style>
+  .hb { padding-block: var(--space-12) var(--space-16); max-width: 1000px; }
+  .intro { display: grid; grid-template-columns: auto 1fr; gap: clamp(1.5rem, 5vw, 4rem); align-items: center; margin-bottom: var(--space-16); }
+  .hb-img { width: clamp(140px, 24vw, 240px); filter: drop-shadow(0 16px 20px rgb(78 13 28 / 20%)); }
+  .lead { font-size: 1.2rem; color: var(--color-muted); }
+  .where { list-style: none; padding: 0; margin: 0 0 var(--space-16); display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
+  .where li { background: var(--color-white); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-6); }
+  .where h3 { font-size: 1.1rem; margin-bottom: var(--space-2); }
+  .where p { margin: 0; }
+  .ar { display: grid; grid-template-columns: 1fr auto; gap: var(--space-8); align-items: center; background: var(--color-rose-soft); box-shadow: none; padding: clamp(1.5rem, 4vw, 3rem); }
+  .ar ol { padding-inline-start: 1.3rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+  .ar :global(.phone) { width: 120px; height: 120px; color: var(--color-brand); stroke-width: 1.2; }
+  @media (max-width: 700px) {
+    .intro { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+    .ar { grid-template-columns: 1fr; }
+    .ar :global(.phone) { display: none; }
+  }
+</style>

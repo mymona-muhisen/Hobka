@@ -1,0 +1,15 @@
+---
+import Base from '../../layouts/Base.astro';
+import Home from '../../components/Home.astro';
+import { ui } from '../../i18n/ui';
+import type { Lang } from '../../config/catalog';
+
+export function getStaticPaths() {
+  return [{ params: { lang: undefined } }, { params: { lang: 'en' } }];
+}
+const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const t = ui[lang];
+---
+<Base lang={lang} title={t.meta.homeTitle} description={t.meta.homeDesc} altPath={lang === 'ar' ? '/en' : '/'}>
+  <Home lang={lang} />
+</Base>

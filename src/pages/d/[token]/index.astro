@@ -1,0 +1,138 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Logo from '../../../components/Logo.astro';
+import Icon from '../../../components/Icon.astro';
+import { db, type OrderRow } from '../../../lib/db';
+import { statuses, type Status } from '../../../lib/order';
+import { boxes, contact } from '../../../config/catalog';
+import { money } from '../../../lib/pricing';
+
+export const prerender = false;
+
+const token = Astro.params.token ?? '';
+const d = await db();
+const order = token.length >= 20 ? await d.prepare('SELECT * FROM orders WHERE token = ?').bind(token).first<OrderRow>() : null;
+if (!order) return new Response('Not found', { status: 404 });
+
+const lang = order.site_lang === 'en' ? 'en' : 'ar';
+const ar = lang === 'ar';
+const child = order.child ? (JSON.parse(order.child) as { name: string }) : null;
+const box = boxes.find((b) => b.id === order.box);
+const st = order.status as Status;
+// Latest uploaded set of draft page images (a draft update with only a link keeps the previous images).
+const imgEvent = await d.prepare("SELECT note FROM order_events WHERE order_id = ? AND type = 'draft_images' ORDER BY id DESC LIMIT 1").bind(order.id).first<{ note: string }>();
+const [imgVersion, draftImages] = (imgEvent?.note ?? '0:0').split(':').map(Number);
+const T = ar
+  ? { title: 'مسودة قصتك | حبكة', hi: `مرحباً ${order.parent_name}`, code: 'رقم الطلب', status: 'حالة الطلب', draftTitle: child ? `مسودة قصة ${child.name}` : 'المسودة', open: 'افتح المسودة', approve: 'أعتمد المسودة', changes: 'أريد تعديلات', notesLabel: 'اكتب التعديلات التي تريدها', send: 'أرسل الملاحظات', approveNote: 'ملاحظة مع الاعتماد (اختياري)', confirmApprove: 'نعم، أعتمد المسودة', waiting: 'نجهّز مسودة القصة الآن، وسنرسل لك رابط هذه الصفحة عندما تصبح جاهزة.', changesSent: 'وصلتنا ملاحظاتك، وسنرسل لك نسخة معدّلة قريباً على هذا الرابط نفسه.', approved: 'شكراً! اعتمدت المسودة. سنرسل لك تفاصيل الدفع على واتساب، ونبدأ الطباعة بعد وصول الدفعة.', total: 'المبلغ الإجمالي', help: 'سؤال؟ راسلنا على واتساب', pages: 'صفحات المسودة', err: 'لم يتم الحفظ. حاول مرة أخرى.', noteNeed: 'اكتب ملاحظاتك أولاً.' }
+  : { title: 'Your story draft | Hobka', hi: `Hello ${order.parent_name}`, code: 'Order number', status: 'Order status', draftTitle: child ? `${child.name}’s story draft` : 'Draft', open: 'Open the draft', approve: 'Approve the draft', changes: 'I want changes', notesLabel: 'Write the changes you want', send: 'Send notes', approveNote: 'A note with your approval (optional)', confirmApprove: 'Yes, approve the draft', waiting: 'We are preparing the story draft now and will send you this page’s link when it is ready.', changesSent: 'We received your notes and will send an updated version on this same link soon.', approved: 'Thank you! You approved the draft. We’ll send payment details on WhatsApp and start printing once payment arrives.', total: 'Total', help: 'Questions? Message us on WhatsApp', pages: 'Draft pages', err: 'Not saved. Please try again.', noteNeed: 'Please write your notes first.' };
+const reviewable = st === 'draft_sent';
+const after = ['approved', 'paid', 'printing', 'shipped', 'delivered'].includes(st);
+---
+<Base lang={lang} title={T.title} noindex bare>
+  <div class="draft container">
+    <header class="top">
+      <Logo class="dlogo" label="Hobka" />
+    </header>
+    <section class="card head">
+      <h1>{T.hi}</h1>
+      <dl>
+        <div><dt>{T.code}</dt><dd class="ltr">{order.code}</dd></div>
+        <div><dt>{T.status}</dt><dd><span class="badge">{statuses[st]?.[lang] ?? st}</span></dd></div>
+        {box && <div><dt>{ar ? 'الصندوق' : 'Box'}</dt><dd>{box.name[lang]}</dd></div>}
+        <div><dt>{T.total}</dt><dd>{money(order.total, lang)}</dd></div>
+      </dl>
+    </section>
+
+    {(st === 'new' || st === 'drafting') && <p class="notice">{T.waiting}</p>}
+    {st === 'changes_requested' && <p class="notice">{T.changesSent}</p>}
+    {after && <p class="notice ok"><Icon name="check" />{T.approved}</p>}
+
+    {(reviewable || after || st === 'changes_requested') && order.draft_version > 0 && (
+      <section class="card">
+        <h2>{T.draftTitle}</h2>
+        {order.draft_message && <p class="msg">{order.draft_message}</p>}
+        {order.draft_url && <a class="btn btn-primary" href={order.draft_url} target="_blank" rel="noopener">{T.open}</a>}
+        {draftImages > 0 && (
+          <div class="pages" aria-label={T.pages}>
+            {Array.from({ length: draftImages }, (_, i) => <img src={`/d/${token}/img/${imgVersion}-${i}`} alt={`${i + 1}`} loading={i < 2 ? 'eager' : 'lazy'} />)}
+          </div>
+        )}
+      </section>
+    )}
+
+    {reviewable && (
+      <section class="card actions" id="review" data-token={token} data-err={T.err} data-need={T.noteNeed}>
+        <div class="choose">
+          <button class="btn btn-primary" type="button" data-show="approve-box"><Icon name="check" />{T.approve}</button>
+          <button class="btn btn-secondary" type="button" data-show="changes-box">{T.changes}</button>
+        </div>
+        <div id="approve-box" hidden>
+          <label for="approve-note">{T.approveNote}</label>
+          <textarea id="approve-note" rows="2" maxlength="1500"></textarea>
+          <button class="btn btn-primary btn-block" type="button" data-action="approve">{T.confirmApprove}</button>
+        </div>
+        <div id="changes-box" hidden>
+          <label for="changes-note">{T.notesLabel}</label>
+          <textarea id="changes-note" rows="5" maxlength="1500"></textarea>
+          <button class="btn btn-primary btn-block" type="button" data-action="changes">{T.send}</button>
+        </div>
+        <p class="err" role="alert" hidden></p>
+      </section>
+    )}
+
+    <p class="help"><a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener"><Icon name="chat" />{T.help}</a></p>
+  </div>
+</Base>
+
+<script>
+  const box = document.getElementById('review');
+  if (box) {
+    box.querySelectorAll<HTMLButtonElement>('[data-show]').forEach((b) =>
+      b.addEventListener('click', () => {
+        box.querySelectorAll<HTMLElement>('#approve-box, #changes-box').forEach((x) => (x.hidden = x.id !== b.dataset.show));
+        (document.querySelector(`#${b.dataset.show} textarea`) as HTMLTextAreaElement)?.focus();
+      }),
+    );
+    box.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const action = b.dataset.action!;
+        const note = (document.getElementById(action === 'approve' ? 'approve-note' : 'changes-note') as HTMLTextAreaElement).value.trim();
+        const err = box.querySelector<HTMLElement>('.err')!;
+        if (action === 'changes' && note.length < 3) { err.textContent = box.dataset.need!; err.hidden = false; return; }
+        b.disabled = true;
+        try {
+          const r = await fetch('/api/draft', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: box.dataset.token, action, note }) });
+          if (!r.ok) throw new Error();
+          location.reload();
+        } catch {
+          err.textContent = box.dataset.err!; err.hidden = false; b.disabled = false;
+        }
+      }),
+    );
+  }
+</script>
+
+<style>
+  .draft { max-width: 760px; padding-block: var(--space-6) var(--space-16); }
+  .top { display: flex; justify-content: center; margin-bottom: var(--space-6); }
+  .top :global(.dlogo) { width: 120px; }
+  .card { margin-bottom: var(--space-6); }
+  h1 { font-size: 1.8rem; }
+  dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-4); margin: 0; }
+  dt { color: var(--color-muted); font-size: 0.9rem; }
+  dd { margin: 0; font-weight: 700; }
+  .notice { background: var(--color-rose-soft); border-radius: var(--radius-md); padding: var(--space-4) var(--space-6); }
+  .notice.ok { background: #e3f2e9; color: #1b5a39; display: flex; gap: var(--space-2); align-items: flex-start; }
+  .notice.ok :global(svg) { width: 22px; flex: none; margin-top: 3px; }
+  .msg { white-space: pre-line; }
+  .pages { display: grid; gap: var(--space-4); margin-top: var(--space-6); }
+  .pages img { width: 100%; border-radius: var(--radius-md); box-shadow: var(--shadow-card); background: var(--color-paper); }
+  .choose { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .choose .btn { flex: 1; }
+  label { display: block; font-weight: 700; margin: var(--space-6) 0 var(--space-2); }
+  textarea { width: 100%; font: inherit; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); padding: 0.75rem 1rem; background: var(--color-paper); margin-bottom: var(--space-3); }
+  .err { color: var(--color-error); font-weight: 600; margin-top: var(--space-3); }
+  .help { text-align: center; }
+  .help a { display: inline-flex; gap: var(--space-2); align-items: center; }
+  .help :global(svg) { width: 20px; }
+</style>

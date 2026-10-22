@@ -1,0 +1,61 @@
+---
+import Base from '../../layouts/Base.astro';
+import Prose from '../../components/Prose.astro';
+import { contact, photoRetentionDays as days, type Lang } from '../../config/catalog';
+export function getStaticPaths() { return [{ params: { lang: undefined } }, { params: { lang: 'en' } }]; }
+const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const wa = `https://wa.me/${contact.whatsapp}`;
+---
+<Base lang={lang} title={lang === 'ar' ? 'سياسة الخصوصية | حبكة' : 'Privacy policy | Hobka'} altPath={lang === 'ar' ? '/en/privacy' : '/privacy'}>
+  {lang === 'ar' ? (
+    <Prose title="سياسة الخصوصية" lang="ar">
+      <p>نصنع قصصاً لأطفال حقيقيين، لذلك نتعامل مع بياناتهم بعناية. هذه الصفحة تشرح ببساطة ماذا نجمع، ولماذا، وكم نحتفظ به.</p>
+      <h2>ماذا نجمع</h2>
+      <ul>
+        <li><strong>بيانات ولي الأمر:</strong> الاسم، رقم الواتساب، المحافظة والعنوان، وملاحظات الطلب.</li>
+        <li><strong>بيانات الطفل اللازمة للقصة فقط:</strong> الاسم الأول، ولد أو بنت، العمر، ما يحبه، وصف شكله، والقيمة أو الفكرة المختارة.</li>
+        <li><strong>صور الطفل (اختيارية):</strong> فقط إذا اخترت رفعها ووافقت على ذلك صراحة.</li>
+      </ul>
+      <h2>لماذا نستخدمها</h2>
+      <p>لكتابة القصة ورسمها، وللتواصل معك بخصوص المسودة والدفع والتوصيل. لا نبيع بياناتك، ولا نستخدمها للإعلانات، ولا نشاركها مع أي جهة إلا شركة الشحن التي تحتاج اسمك وعنوانك ورقمك لإيصال الطلب.</p>
+      <h2>صور الأطفال</h2>
+      <ul>
+        <li>تُستخدم فقط لرسم شخصية طفلك في قصته.</li>
+        <li>لا تُنشر أبداً، ولا تظهر في إعلانات أو صفحات حبكة.</li>
+        <li>تُحذف تلقائياً من خوادمنا بعد {days} يوماً، أو قبل ذلك عند طلبك.</li>
+        <li>إن أرسلتها على واتساب، تبقى في المحادثة، ويمكنك حذفها منها متى شئت.</li>
+      </ul>
+      <h2>أين تُحفظ البيانات</h2>
+      <p>تُحفظ الطلبات على خوادم Cloudflare، ولا يطّلع عليها إلا فريق حبكة. لا نستخدم ملفات تعريف ارتباط (كوكيز) للتتبع أو الإعلانات.</p>
+      <h2>كم نحتفظ بها</h2>
+      <p>نحتفظ ببيانات الطلب ما دام ذلك لازماً لإتمامه ومتابعته وحساباتنا. يمكنك أن تطلب حذف بياناتك في أي وقت.</p>
+      <h2>حقوقك</h2>
+      <p>يمكنك أن تطلب الاطلاع على بياناتك أو تصحيحها أو حذفها، بمراسلتنا على <a href={wa}>واتساب <span class="ltr">{contact.whatsappDisplay}</span></a>.</p>
+    </Prose>
+  ) : (
+    <Prose title="Privacy policy" lang="en">
+      <p>We make stories for real children, so we handle their data with care. This page explains simply what we collect, why, and how long we keep it.</p>
+      <h2>What we collect</h2>
+      <ul>
+        <li><strong>Parent details:</strong> name, WhatsApp number, governorate and address, and order notes.</li>
+        <li><strong>Only the child details the story needs:</strong> first name, boy or girl, age, interests, a description of their look, and the chosen value or idea.</li>
+        <li><strong>Child photos (optional):</strong> only if you choose to upload them and explicitly agree.</li>
+      </ul>
+      <h2>Why we use it</h2>
+      <p>To write and illustrate the story, and to contact you about the draft, payment and delivery. We never sell your data, use it for ads, or share it with anyone except the delivery company, which needs your name, address and number to deliver.</p>
+      <h2>Children’s photos</h2>
+      <ul>
+        <li>Used only to draw your child’s character in their story.</li>
+        <li>Never published, and never used in Hobka ads or pages.</li>
+        <li>Deleted automatically from our servers after {days} days, or earlier on request.</li>
+        <li>If you send them on WhatsApp, they stay in that chat and you can delete them anytime.</li>
+      </ul>
+      <h2>Where data is stored</h2>
+      <p>Orders are stored on Cloudflare servers and only the Hobka team can see them. We use no tracking or advertising cookies.</p>
+      <h2>How long we keep it</h2>
+      <p>We keep order data as long as needed to complete and follow up the order and for our accounts. You can ask us to delete your data at any time.</p>
+      <h2>Your rights</h2>
+      <p>You can ask to see, correct or delete your data by messaging us on <a href={wa}>WhatsApp <span class="ltr">{contact.whatsappDisplay}</span></a>.</p>
+    </Prose>
+  )}
+</Base>

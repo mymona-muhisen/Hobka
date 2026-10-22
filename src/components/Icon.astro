@@ -1,0 +1,20 @@
+---
+// Small original line icons (no third-party brand marks).
+interface Props { name: 'chat' | 'camera' | 'facebook' | 'arrow' | 'check' | 'menu' | 'close' | 'star' | 'gift' | 'heart' | 'phone' | 'sparkle'; class?: string }
+const { name, class: cls } = Astro.props;
+const paths: Record<string, string> = {
+  chat: '<path d="M4 18.5 5.3 15A7.5 7.5 0 1 1 9 18.3Z"/><path d="M9 9.5c.3 1.8 1.7 3.4 3.6 4.1l1.1-1 1.6.8-.4 1.3c-3 .3-6.3-2.6-6.6-5.6l1.3-.4.8 1.6Z" fill="currentColor" stroke="none"/>',
+  camera: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r="1" fill="currentColor"/>',
+  facebook: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M13.5 20.5v-7h2.3l.4-2.6h-2.7V9.3c0-.8.3-1.3 1.4-1.3h1.4V5.7c-.6-.1-1.3-.2-2-.2-2 0-3.3 1.2-3.3 3.4v2H8.7v2.6H11v7"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/>',
+  gift: '<rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-1-3-5-4.5-5.5-2S10 8 12 8Zm0 0c1-3 5-4.5 5.5-2S14 8 12 8Z"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z"/>',
+  phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+};
+---
+<svg class={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={paths[name]} />

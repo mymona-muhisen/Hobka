@@ -1,0 +1,81 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import { db, type OrderRow } from '../../lib/db';
+import { statuses, type Status } from '../../lib/order';
+import { boxes, governorates } from '../../config/catalog';
+import { money } from '../../lib/pricing';
+
+export const prerender = false;
+
+const status = Astro.url.searchParams.get('status') ?? 'open';
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+const d = await db();
+const where: string[] = [];
+const binds: unknown[] = [];
+if (status === 'open') where.push("status NOT IN ('delivered','cancelled')");
+else if (status !== 'all' && status in statuses) { where.push('status = ?'); binds.push(status); }
+if (q) {
+  where.push('(code LIKE ? OR parent_name LIKE ? OR phone LIKE ? OR child LIKE ?)');
+  const like = `%${q.replace(/[%_]/g, '')}%`;
+  binds.push(like, like, like, like);
+}
+const sql = `SELECT * FROM orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT 200`;
+const { results: orders } = await d.prepare(sql).bind(...binds).all<OrderRow>();
+const { results: counts } = await d.prepare('SELECT status, COUNT(*) AS n FROM orders GROUP BY status').all<{ status: string; n: number }>();
+const count = Object.fromEntries(counts.map((c) => [c.status, c.n]));
+const openCount = counts.filter((c) => !['delivered', 'cancelled'].includes(c.status)).reduce((s, c) => s + c.n, 0);
+const fmtDate = (iso: string) => new Date(iso).toLocaleString('ar-SY', { timeZone: 'Asia/Damascus', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: string }).name : '—');
+---
+<Admin title="الطلبات">
+  <h1>الطلبات</h1>
+  <form class="filters" method="get">
+    <select name="status" aria-label="الحالة" onchange="this.form.submit()">
+      <option value="open" selected={status === 'open'}>المفتوحة ({openCount})</option>
+      <option value="all" selected={status === 'all'}>الكل</option>
+      {Object.entries(statuses).map(([k, v]) => <option value={k} selected={status === k}>{v.ar} ({count[k] ?? 0})</option>)}
+    </select>
+    <input type="search" name="q" value={q} placeholder="بحث: رقم الطلب، الاسم، الهاتف" aria-label="بحث" />
+    <button class="abtn" type="submit">بحث</button>
+  </form>
+
+  {orders.length === 0 ? (
+    <p class="apanel">لا توجد طلبات هنا بعد.</p>
+  ) : (
+    <ul class="olist">
+      {orders.map((o) => (
+        <li>
+          <a href={`/admin/order/${o.code}`} class="orow">
+            <span class="c1">
+              <strong class="ltr">{o.code}</strong>
+              <span class="muted">{fmtDate(o.created_at)}</span>
+            </span>
+            <span class="c2">
+              <strong>{o.parent_name}</strong>
+              <span class="muted">{o.kind === 'box' ? `${boxes.find((b) => b.id === o.box)?.name.ar ?? ''} · ${childName(o)}` : 'منتجات منفردة'} · {governorates.find((g) => g.id === o.governorate)?.name.ar}</span>
+            </span>
+            <span class="c3">
+              <span class={`st st-${o.status}`}>{statuses[o.status as Status]?.ar ?? o.status}</span>
+              <span>{money(o.total)}{o.photo_count > 0 ? ' · 📷' : o.photo_mode === 'whatsapp' ? ' · 📷 واتساب' : ''}</span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</Admin>
+<style>
+  .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .filters select, .filters input { font: inherit; padding: 0.5rem 0.8rem; border: 1.5px solid var(--color-border); border-radius: 99px; background: #fff; min-height: 44px; }
+  .filters input { flex: 1; min-width: 200px; }
+  .olist { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+  .orow { display: grid; grid-template-columns: 9rem 1fr auto; gap: 1rem; align-items: center; background: #fff; border-radius: 14px; padding: 0.9rem 1rem; text-decoration: none; color: var(--color-ink); box-shadow: 0 2px 8px rgb(45 32 36 / 5%); }
+  .orow:hover { outline: 2px solid var(--color-rose); }
+  .orow span { display: flex; flex-direction: column; gap: 0.1rem; }
+  .c3 { align-items: flex-end; text-align: end; }
+  .muted { font-size: 0.88rem; }
+  @media (max-width: 640px) {
+    .orow { grid-template-columns: 1fr auto; }
+    .c1 { grid-column: 1 / -1; flex-direction: row !important; justify-content: space-between; }
+  }
+</style>

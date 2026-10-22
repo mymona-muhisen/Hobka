@@ -1,0 +1,46 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { ui } from '../i18n/ui';
+import type { Lang } from '../config/catalog';
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description?: string;
+  /** path of the same page in the other language */
+  altPath?: string;
+  noindex?: boolean;
+  bare?: boolean;
+}
+const { lang, title, description, altPath, noindex = false, bare = false } = Astro.props;
+const t = ui[lang];
+---
+<!doctype html>
+<html lang={lang} dir={t.dir}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <meta name="theme-color" content="#771427" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/Tajawal-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/BalooBhaijaan2-ExtraBold.woff2" as="font" type="font/woff2" crossorigin />
+    <meta property="og:title" content={title} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:image" content="/images/hero-book.webp" />
+    <meta property="og:locale" content={lang === 'ar' ? 'ar_SY' : 'en_US'} />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip" href="#main">{t.common.skip}</a>
+    {!bare && <Header lang={lang} altPath={altPath} />}
+    <main id="main">
+      <slot />
+    </main>
+    {!bare && <Footer lang={lang} />}
+  </body>
+</html>

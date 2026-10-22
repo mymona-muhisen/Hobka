@@ -1,0 +1,15 @@
+---
+import Base from '../../layouts/Base.astro';
+import OrderForm from '../../components/OrderForm.astro';
+import { orderUi } from '../../i18n/order';
+import type { Lang } from '../../config/catalog';
+
+export function getStaticPaths() {
+  return [{ params: { lang: undefined } }, { params: { lang: 'en' } }];
+}
+const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const t = orderUi[lang];
+---
+<Base lang={lang} title={t.metaTitle} description={t.metaDesc} altPath={lang === 'ar' ? '/en/order' : '/order'}>
+  <OrderForm lang={lang} />
+</Base>

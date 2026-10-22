@@ -1,0 +1,36 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import { checkPassword, sessionCookie, adminConfigured, sameOrigin, clientKey, isAdmin } from '../../lib/auth';
+import { rateLimit } from '../../lib/db';
+
+export const prerender = false;
+let error = '';
+if (Astro.request.method === 'GET' && (await isAdmin(Astro.request))) return Astro.redirect('/admin', 303);
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  if (!(await rateLimit('login:' + (await clientKey(Astro.request)), 6, 900))) {
+    error = 'محاولات كثيرة. انتظري 15 دقيقة ثم حاولي مجدداً.';
+  } else {
+    const form = await Astro.request.formData();
+    if (await checkPassword(String(form.get('password') ?? ''))) {
+      return new Response(null, { status: 303, headers: { Location: '/admin', 'Set-Cookie': await sessionCookie() } });
+    }
+    error = 'كلمة السر غير صحيحة.';
+  }
+}
+---
+<Admin title="دخول" nav={false}>
+  <div class="login apanel">
+    <h1>لوحة إدارة حبكة</h1>
+    {!adminConfigured() && <p class="flash bad">لم تُضبط كلمة سر الإدارة بعد (ADMIN_PASSWORD). راجعي دليل النشر.</p>}
+    {error && <p class="flash bad" role="alert">{error}</p>}
+    <form method="post">
+      <div class="afield">
+        <label for="pw">كلمة السر</label>
+        <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus />
+      </div>
+      <button class="abtn primary" type="submit" style="width:100%">دخول</button>
+    </form>
+  </div>
+</Admin>
+<style>.login { max-width: 380px; margin: 12vh auto 0; }</style>

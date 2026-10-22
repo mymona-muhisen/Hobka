@@ -1,0 +1,93 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import { db, now } from '../../lib/db';
+import { sameOrigin } from '../../lib/auth';
+import { normCode, type DiscountRow } from '../../lib/discount';
+
+export const prerender = false;
+
+const d = await db();
+let error = '';
+const flash = Astro.url.searchParams.get('ok') ?? '';
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  const f = await Astro.request.formData();
+  const action = String(f.get('action') ?? '');
+  try {
+    if (action === 'create') {
+      const code = normCode(String(f.get('code') ?? ''));
+      if (!/^[A-Z0-9_-]{3,30}$/.test(code)) throw new Error('الكود: 3 إلى 30 حرفاً إنجليزياً أو رقماً، بدون مسافات.');
+      const kind = String(f.get('kind')) === 'fixed' ? 'fixed' : 'percent';
+      const value = Number(f.get('value'));
+      if (!(value > 0) || (kind === 'percent' && value > 100)) throw new Error('قيمة الخصم غير صحيحة.');
+      const maxUses = String(f.get('max_uses') ?? '').trim();
+      const expires = String(f.get('expires_at') ?? '').trim();
+      await d.prepare('INSERT INTO discounts (code, kind, value, active, max_uses, used, expires_at, note, created_at) VALUES (?, ?, ?, 1, ?, 0, ?, ?, ?)')
+        .bind(code, kind, value, maxUses ? Math.max(1, Math.floor(Number(maxUses))) : null, /^\d{4}-\d{2}-\d{2}$/.test(expires) ? expires : null, String(f.get('note') ?? '').slice(0, 200) || null, now())
+        .run();
+    } else if (action === 'toggle') {
+      await d.prepare('UPDATE discounts SET active = 1 - active WHERE code = ?').bind(String(f.get('code'))).run();
+    } else throw new Error('إجراء غير معروف');
+    return Astro.redirect('/admin/discounts?ok=' + encodeURIComponent('تم الحفظ ✓'), 303);
+  } catch (e) {
+    const m = (e as Error).message;
+    error = /UNIQUE|constraint/i.test(m) ? 'هذا الكود موجود مسبقاً.' : m;
+  }
+}
+const { results: codes } = await d.prepare('SELECT * FROM discounts ORDER BY created_at DESC').all<DiscountRow>();
+---
+<Admin title="أكواد الخصم">
+  <h1>أكواد الخصم</h1>
+  {flash && <p class="flash">{flash}</p>}
+  {error && <p class="flash bad" role="alert">{error}</p>}
+
+  <section class="apanel">
+    <h2>كود جديد</h2>
+    <form method="post" class="form">
+      <input type="hidden" name="action" value="create" />
+      <div class="afield"><label for="c">الكود</label><input id="c" name="code" dir="ltr" required placeholder="HOBKA10" /></div>
+      <div class="afield"><label for="k">النوع</label><select id="k" name="kind"><option value="percent">نسبة %</option><option value="fixed">مبلغ ثابت $</option></select></div>
+      <div class="afield"><label for="v">القيمة</label><input id="v" name="value" type="number" step="0.5" min="0.5" required /></div>
+      <div class="afield"><label for="m">أقصى عدد استخدامات (اختياري)</label><input id="m" name="max_uses" type="number" min="1" /></div>
+      <div class="afield"><label for="e">ينتهي بتاريخ (اختياري)</label><input id="e" name="expires_at" type="date" /></div>
+      <div class="afield"><label for="n">ملاحظة (اختياري)</label><input id="n" name="note" placeholder="مثلاً: حملة المؤثرة" /></div>
+      <button class="abtn primary" type="submit">إضافة</button>
+    </form>
+    <p class="muted">الخصم يُطبَّق على المنتجات فقط، لا على الشحن.</p>
+  </section>
+
+  <section class="apanel">
+    <h2>الأكواد</h2>
+    {codes.length === 0 ? <p class="muted">لا توجد أكواد بعد.</p> : (
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الكود</th><th>الخصم</th><th>الاستخدام</th><th>ينتهي</th><th>ملاحظة</th><th></th></tr></thead>
+          <tbody>
+            {codes.map((c) => (
+              <tr class:list={{ off: !c.active }}>
+                <td class="ltr"><strong>{c.code}</strong></td>
+                <td>{c.kind === 'percent' ? `${c.value}%` : `${c.value}$`}</td>
+                <td>{c.used}{c.max_uses ? ` / ${c.max_uses}` : ''}</td>
+                <td>{c.expires_at ?? '—'}</td>
+                <td>{c.note ?? ''}</td>
+                <td>
+                  <form method="post"><input type="hidden" name="action" value="toggle" /><input type="hidden" name="code" value={c.code} />
+                    <button class="abtn" type="submit">{c.active ? 'إيقاف' : 'تفعيل'}</button></form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+</Admin>
+<style>
+  .form { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 1rem; align-items: end; }
+  .form .abtn { margin-bottom: 0.9rem; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: start; padding: 0.5rem; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+  tr.off { opacity: 0.5; }
+</style>

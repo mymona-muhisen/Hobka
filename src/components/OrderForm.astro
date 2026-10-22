@@ -1,0 +1,703 @@
+---
+import Icon from './Icon.astro';
+import { orderUi } from '../i18n/order';
+import { fill, path } from '../i18n/ui';
+import {
+  boxes, items, governorates, storyValues, maxValues, maxPhotos, photoRetentionDays, ages, storyLanguages,
+  artStyles, stylesEnabled, timing, pricesAreFinal, type Lang,
+} from '../config/catalog';
+import { money } from '../lib/pricing';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = orderUi[lang];
+const days = photoRetentionDays;
+const addonItems = Object.values(items).filter((i) => i.status === 'available' && i.addonPrice !== null);
+const ageList = Array.from({ length: ages.max - ages.min + 1 }, (_, i) => ages.min + i);
+const privacyHref = path(lang, '/privacy');
+const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, maxValues, pricesAreFinal };
+---
+<div class="order container">
+  <header class="order-head">
+    <h1>{t.title}</h1>
+    <p class="muted">{t.intro}</p>
+  </header>
+
+  <div class="layout" id="order-layout">
+    <form id="order-form" novalidate>
+      <ol class="progress" aria-hidden="true"></ol>
+      <p class="step-count" id="step-count" aria-live="polite"></p>
+      <div class="form-error" id="form-error" role="alert" hidden></div>
+
+      <!-- 1. What -->
+      <section class="step" data-step="kind">
+        <h2>{t.kindTitle}</h2>
+        <div class="choice-grid" role="radiogroup" aria-label={t.kindTitle}>
+          {boxes.map((b) => (
+            <label class="choice box-choice">
+              <input type="radio" name="box" value={b.id} />
+              <span class="choice-body">
+                <span class="choice-top"><strong>{b.name[lang]}</strong><span class="choice-price">{money(b.price, lang)}</span></span>
+                <span class="muted small">{b.includes.filter((id) => items[id].status === 'available').map((id) => items[id].name[lang]).join('، ')}</span>
+                {b.includes.some((id) => items[id].status === 'soon') && (
+                  <span class="muted small">+ {b.includes.filter((id) => items[id].status === 'soon').map((id) => items[id].name[lang]).join('، ')} <span class="badge badge-soon">{lang === 'ar' ? 'قريباً' : 'soon'}</span></span>
+                )}
+              </span>
+            </label>
+          ))}
+          <label class="choice only-choice">
+            <input type="radio" name="box" value="only" />
+            <span class="choice-body">
+              <strong>{t.kindOnly}</strong>
+              <span class="muted small">{t.kindOnlyDesc}</span>
+            </span>
+          </label>
+        </div>
+        <p class="field-error" data-error="box" hidden></p>
+      </section>
+
+      <!-- 2. Child -->
+      <section class="step" data-step="child" hidden>
+        <h2>{t.childTitle}</h2>
+        <div class="field">
+          <label for="c-name">{t.childName}</label>
+          <input id="c-name" name="childName" type="text" maxlength="40" autocomplete="off" required />
+          <p class="field-error" data-error="childName" hidden></p>
+        </div>
+        <div class="row">
+          <fieldset class="field">
+            <legend>{t.gender}</legend>
+            <div class="seg">
+              <label><input type="radio" name="gender" value="boy" /><span>{t.boy}</span></label>
+              <label><input type="radio" name="gender" value="girl" /><span>{t.girl}</span></label>
+            </div>
+            <p class="field-error" data-error="gender" hidden></p>
+          </fieldset>
+          <div class="field">
+            <label for="c-age">{t.age}</label>
+            <select id="c-age" name="age" required>
+              <option value="">{t.choose}</option>
+              {ageList.map((a) => <option value={a}>{a} {t.years}</option>)}
+            </select>
+            <p class="field-error" data-error="age" hidden></p>
+          </div>
+        </div>
+        <fieldset class="field">
+          <legend>{t.storyLang}</legend>
+          <div class="seg">
+            {storyLanguages.map((l, i) => <label><input type="radio" name="storyLang" value={l.id} checked={l.id === lang} /><span>{l.name[lang]}</span></label>)}
+          </div>
+        </fieldset>
+        <div class="field">
+          <label for="c-look">{t.appearance} <span class="muted">{t.optional}</span></label>
+          <textarea id="c-look" name="appearance" rows="2" maxlength="400" placeholder={t.appearanceHint}></textarea>
+        </div>
+        <div class="field">
+          <label for="c-likes">{t.interests} <span class="muted">{t.optional}</span></label>
+          <input id="c-likes" name="interests" type="text" maxlength="300" placeholder={t.interestsHint} />
+        </div>
+      </section>
+
+      <!-- 3. Story -->
+      <section class="step" data-step="story" hidden>
+        <h2>{t.storyTitle}</h2>
+        <fieldset class="field">
+          <legend>{t.valuesLabel} <span class="muted small">{fill(t.valuesHint, { max: maxValues })}</span></legend>
+          <div class="chips">
+            {storyValues.map((v) => (
+              <label class="chip" title={v.desc[lang]}>
+                <input type="checkbox" name="values" value={v.id} />
+                <span><span aria-hidden="true">{v.emoji}</span> {v.name[lang]}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div class="field">
+          <label for="s-note">{t.valueNote} <span class="muted">{t.optional}</span></label>
+          <input id="s-note" name="valueNote" type="text" maxlength="400" placeholder={t.valueNoteHint} />
+        </div>
+        <p class="or"><span>{t.or}</span></p>
+        <div class="field">
+          <label for="s-idea">{t.ownIdea}</label>
+          <textarea id="s-idea" name="ownIdea" rows="3" maxlength="800" placeholder={t.ownIdeaHint}></textarea>
+        </div>
+        <p class="field-error" data-error="values" hidden></p>
+        {stylesEnabled && (
+          <fieldset class="field">
+            <legend>{t.styleLabel}</legend>
+            <div class="seg wrap">
+              {artStyles.map((s) => <label><input type="radio" name="style" value={s.id} /><span>{s.name[lang]}</span></label>)}
+            </div>
+          </fieldset>
+        )}
+      </section>
+
+      <!-- 4. Photo -->
+      <section class="step" data-step="photo" hidden>
+        <h2>{t.photoTitle}</h2>
+        <p class="muted">{fill(t.photoWhy, { days })}</p>
+        <div class="choice-list" role="radiogroup">
+          <label class="choice"><input type="radio" name="photoMode" value="upload" /><span class="choice-body"><strong>{t.photoUpload}</strong></span></label>
+          <label class="choice"><input type="radio" name="photoMode" value="whatsapp" /><span class="choice-body"><strong>{t.photoWhatsapp}</strong></span></label>
+          <label class="choice"><input type="radio" name="photoMode" value="none" /><span class="choice-body"><strong>{t.photoNone}</strong></span></label>
+        </div>
+        <p class="field-error" data-error="photoMode" hidden></p>
+        <div class="upload" id="upload" hidden>
+          <label class="drop" for="p-files">
+            <Icon name="camera" />
+            <span>{fill(t.photoPick, { max: maxPhotos })}</span>
+            <span class="muted small">{t.photoTip}</span>
+          </label>
+          <input id="p-files" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple class="sr-only" />
+          <ul class="thumbs" id="thumbs"></ul>
+          <p class="field-error" data-error="photos" hidden></p>
+          <label class="check">
+            <input type="checkbox" id="p-consent" />
+            <span>{fill(t.photoConsent, { days })}</span>
+          </label>
+          <p class="field-error" data-error="photoConsent" hidden></p>
+        </div>
+      </section>
+
+      <!-- 5. Add-ons -->
+      <section class="step" data-step="addons" hidden>
+        <h2 id="addons-title" data-box={t.addonsTitle} data-only={t.addonsOnlyTitle}>{t.addonsTitle}</h2>
+        <div class="choice-list">
+          {addonItems.map((it) => (
+            <label class="choice addon" data-addon={it.id} data-standalone={String(it.standalone)}>
+              <input type="checkbox" name="addons" value={it.id} />
+              <span class="choice-body">
+                <span class="choice-top"><strong>{it.name[lang]}</strong><span class="choice-price">+{money(it.addonPrice ?? 0, lang)}</span></span>
+                <span class="muted small">{it.desc[lang]}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <p class="muted" id="addons-none" hidden>{t.addonsNone}</p>
+        <p class="field-error" data-error="addons" hidden></p>
+      </section>
+
+      <!-- 6. Delivery -->
+      <section class="step" data-step="delivery" hidden>
+        <h2>{t.deliveryTitle}</h2>
+        <div class="row">
+          <div class="field">
+            <label for="d-name">{t.parentName}</label>
+            <input id="d-name" name="parentName" type="text" maxlength="60" autocomplete="name" required />
+            <p class="field-error" data-error="parentName" hidden></p>
+          </div>
+          <div class="field">
+            <label for="d-phone">{t.phone}</label>
+            <input id="d-phone" name="phone" type="tel" inputmode="tel" dir="ltr" maxlength="20" autocomplete="tel" placeholder="09xx xxx xxx" required aria-describedby="d-phone-hint" />
+            <p class="hint" id="d-phone-hint">{t.phoneHint}</p>
+            <p class="field-error" data-error="phone" hidden></p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="d-gov">{t.governorate}</label>
+          <select id="d-gov" name="governorate" required>
+            <option value="">{t.choose}</option>
+            {governorates.map((g) => <option value={g.id}>{g.name[lang]} (+{money(g.shipping, lang)})</option>)}
+          </select>
+          <p class="field-error" data-error="governorate" hidden></p>
+        </div>
+        <div class="field">
+          <label for="d-addr">{t.address}</label>
+          <textarea id="d-addr" name="address" rows="2" maxlength="300" autocomplete="street-address" placeholder={t.addressHint} required></textarea>
+          <p class="field-error" data-error="address" hidden></p>
+        </div>
+        <div class="field">
+          <label for="d-notes">{t.notes} <span class="muted">{t.optional}</span></label>
+          <textarea id="d-notes" name="notes" rows="2" maxlength="600"></textarea>
+        </div>
+        <div class="field">
+          <label for="d-code">{t.discount} <span class="muted">{t.optional}</span></label>
+          <div class="inline">
+            <input id="d-code" name="discountCode" type="text" maxlength="30" dir="ltr" autocomplete="off" />
+            <button type="button" class="btn btn-secondary" id="apply-code">{t.apply}</button>
+          </div>
+          <p class="hint" id="code-msg" aria-live="polite"></p>
+        </div>
+        <div class="hp" aria-hidden="true"><label>Website <input name="website" type="text" tabindex="-1" autocomplete="off" /></label></div>
+      </section>
+
+      <!-- 7. Review -->
+      <section class="step" data-step="review" hidden>
+        <h2>{t.reviewTitle}</h2>
+        <dl class="review" id="review"></dl>
+        <label class="check">
+          <input type="checkbox" id="privacy" />
+          <span set:html={fill(t.privacy, { link: `<a href="${privacyHref}" target="_blank">${t.privacyLink}</a>` })} />
+        </label>
+        <p class="field-error" data-error="privacy" hidden></p>
+        <p class="muted small"><Icon name="check" class="inline-icon" />{t.noPayNow}</p>
+      </section>
+
+      <div class="nav">
+        <button type="button" class="btn btn-secondary" id="back">{t.back}</button>
+        <button type="button" class="btn btn-primary" id="next">{t.next}</button>
+        <button type="submit" class="btn btn-primary" id="submit" hidden>{t.submit}</button>
+      </div>
+    </form>
+
+    <aside class="summary" aria-label={t.summary}>
+      <h2>{t.summary}</h2>
+      <ul id="sum-lines"></ul>
+      <dl class="totals">
+        <div><dt>{t.subtotal}</dt><dd id="sum-sub">—</dd></div>
+        <div><dt>{t.shipping}</dt><dd id="sum-ship">{t.shippingPick}</dd></div>
+        <div id="sum-disc-row" hidden><dt>{t.discountLine}</dt><dd id="sum-disc"></dd></div>
+        <div class="total"><dt>{t.total}</dt><dd id="sum-total">—</dd></div>
+      </dl>
+      {!pricesAreFinal && <p class="muted small">{t.priceNote}</p>}
+      <p class="muted small">{t.noPayNow}</p>
+    </aside>
+  </div>
+
+  <section class="result" id="result" hidden tabindex="-1">
+    <div class="result-card">
+      <span class="ok-icon"><Icon name="check" /></span>
+      <h2>{t.okTitle}</h2>
+      <p>{t.okCode}</p>
+      <p class="code ltr" id="ok-code"></p>
+      <p id="ok-next"></p>
+      <a class="btn btn-whatsapp btn-block" id="ok-wa" href="#" target="_blank" rel="noopener"><Icon name="chat" />{t.okWhatsapp}</a>
+      <a class="btn btn-secondary btn-block" href={path(lang, '/')}>{t.okHome}</a>
+    </div>
+  </section>
+</div>
+
+<script type="application/json" id="order-strings" set:html={JSON.stringify(strings)} />
+
+<script>
+  import { boxes, items, governorates, storyValues, maxValues, maxPhotos, type ItemId } from '../config/catalog';
+  import { computePrice, allowedAddons, money, type Discount } from '../lib/pricing';
+
+  type S = Record<string, string | number | boolean | readonly string[]> & { steps: readonly string[]; lang: 'ar' | 'en' };
+  const S = JSON.parse(document.getElementById('order-strings')!.textContent!) as S;
+  const L = S.lang;
+  const str = (k: string, vars: Record<string, string | number> = {}) => String(S[k] ?? k).replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? ''));
+
+  const form = document.getElementById('order-form') as HTMLFormElement;
+  const steps = Array.from(form.querySelectorAll<HTMLElement>('.step'));
+  const byName = (n: string) => steps.find((s) => s.dataset.step === n)!;
+  const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
+  const val = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | null)?.value?.trim() ?? '';
+  const radio = (name: string) => (form.querySelector(`input[name="${name}"]:checked`) as HTMLInputElement | null)?.value ?? '';
+  const checked = (name: string) => Array.from(form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)).map((i) => i.value);
+
+  let discount: Discount | null = null;
+  let photos: { blob: Blob; url: string }[] = [];
+  let current = 0;
+
+  // ───────── preselect from URL (?box=hobka or ?only=1)
+  const q = new URLSearchParams(location.search);
+  const pre = q.get('only') ? 'only' : q.get('box');
+  if (pre) (form.querySelector(`input[name="box"][value="${CSS.escape(pre)}"]`) as HTMLInputElement | null)?.click();
+
+  const isOnly = () => radio('box') === 'only';
+  const flow = () => (isOnly() ? ['kind', 'addons', 'delivery', 'review'] : ['kind', 'child', 'story', 'photo', 'addons', 'delivery', 'review']);
+
+  // ───────── errors
+  function setError(key: string, msg: string | null) {
+    const el = form.querySelector<HTMLElement>(`[data-error="${key}"]`);
+    if (!el) return;
+    el.hidden = !msg;
+    el.textContent = msg ?? '';
+    const field = el.closest('.field, .step')?.querySelector<HTMLElement>('input:not([type=radio]):not([type=checkbox]), select, textarea');
+    if (field && el.closest('.field')) field.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  }
+  function clearErrors(stepEl: HTMLElement) {
+    stepEl.querySelectorAll<HTMLElement>('[data-error]').forEach((e) => { e.hidden = true; e.textContent = ''; });
+    stepEl.querySelectorAll('[aria-invalid]').forEach((e) => e.setAttribute('aria-invalid', 'false'));
+  }
+
+  function validate(name: string): boolean {
+    const el = byName(name);
+    clearErrors(el);
+    const errs: [string, string][] = [];
+    const req = L === 'ar' ? 'هذا الحقل مطلوب.' : 'This field is required.';
+    if (name === 'kind' && !radio('box')) errs.push(['box', req]);
+    if (name === 'child') {
+      if (!val('childName')) errs.push(['childName', req]);
+      if (!radio('gender')) errs.push(['gender', req]);
+      if (!val('age')) errs.push(['age', req]);
+    }
+    if (name === 'story' && checked('values').length === 0 && !val('ownIdea')) errs.push(['values', str('needValue')]);
+    if (name === 'photo') {
+      const mode = radio('photoMode');
+      if (!mode) errs.push(['photoMode', req]);
+      if (mode === 'upload') {
+        if (!photos.length) errs.push(['photos', str('photoNeed')]);
+        if (!($('#p-consent') as HTMLInputElement).checked) errs.push(['photoConsent', str('consentNeed')]);
+      }
+    }
+    if (name === 'addons' && isOnly() && checked('addons').length === 0) errs.push(['addons', str('addonsNeed')]);
+    if (name === 'delivery') {
+      if (val('parentName').length < 2) errs.push(['parentName', req]);
+      if (!/^\+?[0-9 ()-]{7,20}$/.test(val('phone'))) errs.push(['phone', str('phoneBad')]);
+      if (!val('governorate')) errs.push(['governorate', req]);
+      if (val('address').length < 4) errs.push(['address', req]);
+    }
+    if (name === 'review' && !($('#privacy') as HTMLInputElement).checked) errs.push(['privacy', str('privacyNeed')]);
+    errs.forEach(([k, m]) => setError(k, m));
+    if (errs.length) {
+      const first = el.querySelector<HTMLElement>('[data-error]:not([hidden])');
+      const target = first?.closest('.field, fieldset, .step')?.querySelector<HTMLElement>('input, select, textarea') ?? first;
+      target?.focus({ preventScroll: false });
+    }
+    return errs.length === 0;
+  }
+
+  // ───────── navigation
+  function render() {
+    const f = flow();
+    const name = f[current];
+    steps.forEach((s) => (s.hidden = s.dataset.step !== name));
+    $('#step-count').textContent = str('stepOf', { n: current + 1, total: f.length }) + ' · ' + S.steps[['kind', 'child', 'story', 'photo', 'addons', 'delivery', 'review'].indexOf(name)];
+    const prog = form.querySelector('.progress')!;
+    prog.innerHTML = f.map((_, i) => `<li class="${i < current ? 'done' : i === current ? 'cur' : ''}"></li>`).join('');
+    ($('#back') as HTMLButtonElement).style.visibility = current === 0 ? 'hidden' : 'visible';
+    $('#next').hidden = name === 'review';
+    $('#submit').hidden = name !== 'review';
+    if (name === 'addons') prepareAddons();
+    if (name === 'review') renderReview();
+    updateSummary();
+  }
+  function go(delta: number) {
+    const f = flow();
+    if (delta > 0 && !validate(f[current])) return;
+    current = Math.max(0, Math.min(f.length - 1, current + delta));
+    render();
+    const h = byName(flow()[current]).querySelector('h2') as HTMLElement;
+    h.setAttribute('tabindex', '-1');
+    h.focus();
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('#next').addEventListener('click', () => go(1));
+  $('#back').addEventListener('click', () => go(-1));
+  form.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type !== 'checkbox') { e.preventDefault(); if (!$('#next').hidden) go(1); }
+  });
+
+  // clear a field's error as soon as the parent fixes it
+  form.addEventListener('input', (e) => clearFieldError(e.target as HTMLElement));
+  form.addEventListener('change', (e) => clearFieldError(e.target as HTMLElement));
+  function clearFieldError(el: HTMLElement) {
+    const box = el.closest('.field, fieldset, .upload, .step');
+    const errs = el.closest('.upload') ? [...box!.querySelectorAll<HTMLElement>('[data-error]')].filter((x) => x.dataset.error === (el.id === 'p-consent' ? 'photoConsent' : 'photos'))
+      : [...(box?.querySelectorAll<HTMLElement>(':scope > [data-error], :scope > .field-error') ?? [])];
+    if (el.getAttribute('name') === 'values' || el.id === 's-idea') errs.push(form.querySelector('[data-error="values"]')!);
+    if (el.getAttribute('name') === 'photoMode') errs.push(form.querySelector('[data-error="photoMode"]')!);
+    if (el.getAttribute('name') === 'box') errs.push(form.querySelector('[data-error="box"]')!);
+    if (el.id === 'privacy') errs.push(form.querySelector('[data-error="privacy"]')!);
+    if (el.getAttribute('name') === 'addons') errs.push(form.querySelector('[data-error="addons"]')!);
+    errs.forEach((x) => { if (x) { x.hidden = true; x.textContent = ''; } });
+    if (el.getAttribute('aria-invalid') === 'true') el.setAttribute('aria-invalid', 'false');
+  }
+
+  // ───────── values: max N
+  form.querySelectorAll<HTMLInputElement>('input[name="values"]').forEach((cb) =>
+    cb.addEventListener('change', () => {
+      const all = form.querySelectorAll<HTMLInputElement>('input[name="values"]');
+      const n = checked('values').length;
+      all.forEach((x) => (x.disabled = !x.checked && n >= maxValues));
+    }),
+  );
+
+  // ───────── add-ons depend on the box
+  function prepareAddons() {
+    const box = isOnly() ? null : (radio('box') as never);
+    const ok = new Set(allowedAddons(isOnly() ? 'addons' : 'box', box));
+    let visible = 0;
+    form.querySelectorAll<HTMLElement>('.addon').forEach((el) => {
+      const show = ok.has(el.dataset.addon as ItemId);
+      el.hidden = !show;
+      if (!show) (el.querySelector('input') as HTMLInputElement).checked = false;
+      if (show) visible++;
+    });
+    $('#addons-none').hidden = visible > 0;
+    const title = $('#addons-title');
+    title.textContent = isOnly() ? title.dataset.only! : title.dataset.box!;
+  }
+  form.querySelectorAll('input[name="box"]').forEach((r) => r.addEventListener('change', () => { prepareAddons(); updateSummary(); }));
+
+  // ───────── photos: resize in the browser before upload (smaller, strips most metadata)
+  const upload = $('#upload');
+  form.querySelectorAll('input[name="photoMode"]').forEach((r) => r.addEventListener('change', () => (upload.hidden = radio('photoMode') !== 'upload')));
+  async function shrink(file: File): Promise<Blob> {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+    return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('blob'))), 'image/jpeg', 0.86));
+  }
+  function renderThumbs() {
+    const ul = $('#thumbs');
+    ul.innerHTML = '';
+    photos.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<img alt="" src="${p.url}"><button type="button" class="rm">${str('photoRemove')}</button>`;
+      li.querySelector('button')!.addEventListener('click', () => { URL.revokeObjectURL(p.url); photos.splice(i, 1); renderThumbs(); });
+      ul.appendChild(li);
+    });
+  }
+  ($('#p-files') as HTMLInputElement).addEventListener('change', async (e) => {
+    const input = e.target as HTMLInputElement;
+    setError('photos', null);
+    for (const f of Array.from(input.files ?? [])) {
+      if (photos.length >= maxPhotos) break;
+      try {
+        const blob = await shrink(f);
+        photos.push({ blob, url: URL.createObjectURL(blob) });
+      } catch { setError('photos', str('photoBad')); }
+    }
+    input.value = '';
+    renderThumbs();
+  });
+
+  // ───────── discount
+  $('#apply-code').addEventListener('click', async () => {
+    const code = val('discountCode');
+    const msg = $('#code-msg');
+    discount = null;
+    if (!code) { msg.textContent = ''; updateSummary(); return; }
+    try {
+      const r = await fetch('/api/discount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+      const j = (await r.json()) as { valid: boolean; code?: string; kind?: 'percent' | 'fixed'; value?: number };
+      if (j.valid) { discount = { code: j.code!, kind: j.kind!, value: j.value! }; msg.textContent = str('discountOk'); msg.className = 'hint ok'; }
+      else { msg.textContent = str('discountBad'); msg.className = 'hint bad'; }
+    } catch { msg.textContent = str('errNetwork'); msg.className = 'hint bad'; }
+    updateSummary();
+  });
+  ($('#d-code') as HTMLInputElement).addEventListener('input', () => { if (discount) { discount = null; $('#code-msg').textContent = ''; updateSummary(); } });
+
+  // ───────── summary & review
+  function priceNow() {
+    const b = radio('box');
+    if (!b) return null;
+    return computePrice({ kind: b === 'only' ? 'addons' : 'box', box: b === 'only' ? null : (b as never), addons: checked('addons') as ItemId[], governorate: val('governorate') }, discount);
+  }
+  const lineName = (id: string) => {
+    const [kind, key] = id.split(':');
+    return kind === 'box' ? boxes.find((b) => b.id === key)!.name[L] : items[key as ItemId].name[L];
+  };
+  function updateSummary() {
+    const p = priceNow();
+    const ul = $('#sum-lines');
+    if (!p) { ul.innerHTML = ''; $('#sum-sub').textContent = '—'; $('#sum-total').textContent = '—'; return; }
+    ul.innerHTML = p.lines.map((l) => `<li><span>${lineName(l.id)}</span><span>${money(l.amount, L)}</span></li>`).join('');
+    $('#sum-sub').textContent = money(p.subtotal, L);
+    $('#sum-ship').textContent = val('governorate') ? money(p.shipping, L) : str('shippingPick');
+    $('#sum-disc-row').hidden = !p.discount;
+    $('#sum-disc').textContent = '−' + money(p.discount, L);
+    $('#sum-total').textContent = money(p.total, L);
+  }
+  form.addEventListener('change', updateSummary);
+
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  function renderReview() {
+    // [label, value, step, isHtml]: user text is always escaped; only our own markup is passed as HTML.
+    const rows: [string, string, string, boolean?][] = [];
+    const b = radio('box');
+    rows.push([str('box'), b === 'only' ? str('kindOnly') : boxes.find((x) => x.id === b)!.name[L], 'kind']);
+    if (!isOnly()) {
+      rows.push([str('child'), `${val('childName')} · ${radio('gender') === 'girl' ? str('girl') : str('boy')} · ${val('age')} ${str('years')}`, 'child']);
+      const vs = checked('values').map((id) => storyValues.find((v) => v.id === id)!.name[L]).join('، ');
+      if (vs) rows.push([str('values'), vs + (val('valueNote') ? ` (${val('valueNote')})` : ''), 'story']);
+      if (val('ownIdea')) rows.push([str('idea'), val('ownIdea'), 'story']);
+      const pm = radio('photoMode');
+      rows.push([str('photo'), pm === 'upload' ? `${str('photoUpload')} (${photos.length})` : pm === 'whatsapp' ? str('photoWhatsapp') : str('photoNone'), 'photo']);
+    }
+    const adds = checked('addons').map((id) => items[id as ItemId].name[L]).join('، ');
+    if (adds) rows.push([str('addonsTitle'), adds, 'addons']);
+    const gov = governorates.find((g) => g.id === val('governorate'));
+    rows.push([str('delivery'), `${esc(val('parentName'))} · <span dir="ltr">${esc(val('phone'))}</span> · ${esc(gov?.name[L] ?? '')}<br>${esc(val('address'))}`, 'delivery', true]);
+    const p = priceNow();
+    if (p) rows.push([str('total'), `<strong>${money(p.total, L)}</strong>`, 'delivery', true]);
+    $('#review').innerHTML = rows
+      .map(([k, v, step, html]) => `<div><dt>${esc(k)}</dt><dd>${html ? v : esc(v)}</dd><button type="button" class="edit" data-go="${step}">${str('edit')}</button></div>`)
+      .join('');
+    $('#review').querySelectorAll<HTMLButtonElement>('.edit').forEach((btn) => btn.addEventListener('click', () => { current = flow().indexOf(btn.dataset.go!); render(); }));
+  }
+
+  // ───────── submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!validate('review')) return;
+    const errBox = $('#form-error');
+    errBox.hidden = true;
+    const btn = $('#submit') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = str('submitting');
+    const b = radio('box');
+    const data = {
+      siteLang: L,
+      kind: b === 'only' ? 'addons' : 'box',
+      box: b === 'only' ? null : b,
+      addons: checked('addons'),
+      child: b === 'only' ? null : {
+        name: val('childName'), gender: radio('gender'), age: Number(val('age')), storyLang: radio('storyLang') || L,
+        values: checked('values'), valueNote: val('valueNote'), ownIdea: val('ownIdea'),
+        appearance: val('appearance'), interests: val('interests'), ...(radio('style') ? { style: radio('style') } : {}),
+      },
+      photoMode: b === 'only' ? 'none' : radio('photoMode'),
+      photoConsent: ($('#p-consent') as HTMLInputElement).checked,
+      parent: { name: val('parentName'), phone: val('phone'), governorate: val('governorate'), address: val('address'), notes: val('notes') },
+      discountCode: discount ? discount.code : '',
+      privacyAccepted: true,
+      website: val('website'),
+    };
+    const fd = new FormData();
+    fd.append('data', JSON.stringify(data));
+    if (data.photoMode === 'upload') photos.forEach((p, i) => fd.append('photo', p.blob, `photo${i}.jpg`));
+    try {
+      const r = await fetch('/api/order', { method: 'POST', body: fd });
+      const j = (await r.json().catch(() => ({}))) as { ok?: boolean; code?: string; whatsapp?: string; error?: string };
+      if (!r.ok || !j.ok) {
+        const map: Record<string, string> = { rate_limited: 'errRate', invalid: 'errInvalid', photo_too_large: 'errPhoto', photo_type: 'errPhoto', photo_missing: 'errPhoto', discount_invalid: 'errDiscount' };
+        throw new Error(map[j.error ?? ''] ?? 'errGeneric');
+      }
+      // success: show a real confirmation from the server
+      $('#order-layout').hidden = true;
+      document.querySelector<HTMLElement>('.order-head')!.hidden = true;
+      $('#ok-code').textContent = j.code!;
+      $('#ok-next').textContent = str('okNext', { draft: String(S.draft) }) + (data.photoMode === 'whatsapp' ? ' ' + str('okNextPhoto') : '');
+      ($('#ok-wa') as HTMLAnchorElement).href = j.whatsapp!;
+      const res = $('#result');
+      res.hidden = false;
+      res.focus();
+      window.scrollTo({ top: 0 });
+      photos.forEach((p) => URL.revokeObjectURL(p.url));
+    } catch (err) {
+      const key = err instanceof TypeError ? 'errNetwork' : (err as Error).message;
+      errBox.innerHTML = `<strong>${esc(str('errTitle'))}</strong><br>${esc(str(key))}`;
+      errBox.hidden = false;
+      errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      btn.disabled = false;
+      btn.textContent = str('submit');
+    }
+  });
+
+  render();
+  if (pre) updateSummary();
+</script>
+
+<style>
+  .order { padding-block: var(--space-8) var(--space-16); }
+  .order-head { max-width: 720px; margin-bottom: var(--space-8); }
+  .order-head h1 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin-bottom: var(--space-2); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-8); align-items: start; }
+  form { background: var(--color-white); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); padding: clamp(1.25rem, 3vw, 2.5rem); scroll-margin-top: 90px; }
+  .progress { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 var(--space-3); }
+  .progress :global(li) { flex: 1; height: 6px; border-radius: 99px; background: var(--color-border); }
+  .progress :global(li.done) { background: var(--color-rose); }
+  .progress :global(li.cur) { background: var(--color-brand); }
+  .step-count { color: var(--color-muted); font-size: 0.95rem; margin-bottom: var(--space-6); }
+  .step h2 { font-size: clamp(1.4rem, 2.4vw, 1.8rem); outline: none; }
+  .small { font-size: 0.92rem; }
+
+  .field { margin-bottom: var(--space-6); border: 0; padding: 0; min-width: 0; }
+  label, legend { font-weight: 700; display: block; margin-bottom: var(--space-2); padding: 0; }
+  input[type='text'], input[type='tel'], select, textarea {
+    width: 100%; font: inherit; color: var(--color-ink); background: var(--color-paper);
+    border: 1.5px solid var(--color-border); border-radius: var(--radius-md); padding: 0.75rem 1rem; min-height: 52px;
+  }
+  textarea { resize: vertical; min-height: 84px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-brand); box-shadow: 0 0 0 3px rgb(119 20 39 / 15%); background: #fff; }
+  [aria-invalid='true'] { border-color: var(--color-error) !important; }
+  .hint { color: var(--color-muted); font-size: 0.92rem; margin: var(--space-1) 0 0; font-weight: 400; }
+  .hint.ok { color: var(--color-success); }
+  .hint.bad { color: var(--color-error); }
+  .field-error { color: var(--color-error); font-weight: 600; font-size: 0.95rem; margin: var(--space-2) 0 0; }
+  .field-error::before { content: '⚠ '; }
+  .form-error { background: #fdecee; border: 1px solid #f2b8bf; color: var(--color-error); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-6); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .inline { display: flex; gap: var(--space-2); }
+  .inline .btn { min-height: 52px; flex: none; }
+  .hp { position: absolute; inset-inline-start: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  /* choice cards */
+  .choice-grid, .choice-list { display: grid; gap: var(--space-3); }
+  .choice-grid { grid-template-columns: 1fr 1fr; }
+  .choice { position: relative; display: block; margin: 0; cursor: pointer; font-weight: 400; }
+  .choice input { position: absolute; opacity: 0; inset-inline-start: 1rem; top: 1.2rem; }
+  .choice-body { display: flex; flex-direction: column; gap: var(--space-1); border: 1.5px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-4); padding-inline-start: 3rem; background: var(--color-paper); height: 100%; transition: border-color .15s, background .15s; }
+  .choice-body::before { content: ''; position: absolute; inset-inline-start: 1rem; top: 1.15rem; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #b9a5aa; background: #fff; }
+  .choice input[type='checkbox'] + .choice-body::before { border-radius: 6px; }
+  .choice input:checked + .choice-body { border-color: var(--color-brand); background: var(--color-rose-soft); }
+  .choice input:checked + .choice-body::before { border-color: var(--color-brand); background: var(--color-brand); box-shadow: inset 0 0 0 4px #fff; }
+  .choice input[type='checkbox']:checked + .choice-body::before { box-shadow: none; background: var(--color-brand) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/14px no-repeat; }
+  .choice input:focus-visible + .choice-body { outline: 3px solid var(--color-apricot); outline-offset: 2px; }
+  .choice-top { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
+  .choice-price { font-family: var(--font-display); font-weight: 800; color: var(--color-brand-dark); white-space: nowrap; }
+  .only-choice { grid-column: 1 / -1; }
+  .only-choice .choice-body { background: var(--color-white); border-style: dashed; }
+
+  .seg { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  .seg label { margin: 0; font-weight: 500; }
+  .seg input { position: absolute; opacity: 0; }
+  .seg span { display: inline-flex; align-items: center; min-height: 48px; padding: 0 var(--space-6); border: 1.5px solid var(--color-border); border-radius: 999px; background: var(--color-paper); cursor: pointer; }
+  .seg input:checked + span { background: var(--color-brand); border-color: var(--color-brand); color: #fff; }
+  .seg input:focus-visible + span { outline: 3px solid var(--color-apricot); outline-offset: 2px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .chip { margin: 0; font-weight: 500; }
+  .chip input { position: absolute; opacity: 0; }
+  .chip > span { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; padding: 0 var(--space-4); border: 1.5px solid var(--color-border); border-radius: 999px; background: var(--color-paper); cursor: pointer; }
+  .chip input:checked + span { background: var(--color-rose); border-color: var(--color-brand); color: var(--color-brand-dark); font-weight: 700; }
+  .chip input:disabled + span { opacity: 0.45; cursor: not-allowed; }
+  .chip input:focus-visible + span { outline: 3px solid var(--color-apricot); outline-offset: 2px; }
+  .or { display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); margin: var(--space-2) 0 var(--space-4); }
+  .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
+
+  .upload { margin-top: var(--space-4); }
+  .drop { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); text-align: center; border: 2px dashed #d9b8c2; border-radius: var(--radius-lg); padding: var(--space-8) var(--space-4); background: var(--color-rose-soft); cursor: pointer; font-weight: 700; color: var(--color-brand-dark); }
+  .drop :global(svg) { width: 36px; height: 36px; }
+  .thumbs { list-style: none; padding: 0; margin: var(--space-4) 0; display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .thumbs :global(li) { position: relative; width: 104px; }
+  .thumbs :global(img) { width: 104px; height: 104px; object-fit: cover; border-radius: var(--radius-md); }
+  .thumbs :global(.rm) { margin-top: 4px; width: 100%; font: inherit; font-size: 0.85rem; background: none; border: 1px solid var(--color-border); border-radius: 999px; padding: 2px; cursor: pointer; }
+  .check { display: flex; gap: var(--space-3); align-items: flex-start; font-weight: 400; margin-top: var(--space-4); cursor: pointer; }
+  .check input { width: 22px; height: 22px; flex: none; margin-top: 3px; accent-color: var(--color-brand); }
+
+  .review { margin: 0 0 var(--space-6); display: grid; gap: 0; }
+  .review :global(div) { display: grid; grid-template-columns: 8rem 1fr auto; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); align-items: start; }
+  .review :global(dt) { font-weight: 700; color: var(--color-muted); }
+  .review :global(dd) { margin: 0; overflow-wrap: anywhere; }
+  .review :global(.edit) { font: inherit; font-size: 0.9rem; background: none; border: 0; color: var(--color-brand); text-decoration: underline; cursor: pointer; }
+  :global(.inline-icon) { display: inline; width: 18px; height: 18px; vertical-align: -3px; margin-inline-end: 6px; color: var(--color-success); }
+
+  .nav { display: flex; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-8); padding-top: var(--space-6); border-top: 1px solid var(--color-border); }
+  .nav .btn-primary { min-width: 160px; }
+
+  .summary { position: sticky; top: 96px; background: var(--color-white); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: var(--space-6); }
+  .summary h2 { font-size: 1.2rem; }
+  .summary ul { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-2); }
+  .summary :global(li) { display: flex; justify-content: space-between; gap: var(--space-3); font-size: 0.97rem; }
+  .totals { margin: 0 0 var(--space-4); border-top: 1px dashed var(--color-border); padding-top: var(--space-3); display: grid; gap: var(--space-1); }
+  .totals div { display: flex; justify-content: space-between; }
+  .totals dt { color: var(--color-muted); }
+  .totals dd { margin: 0; }
+  .totals .total { font-weight: 800; font-size: 1.15rem; color: var(--color-brand-dark); border-top: 1px solid var(--color-border); padding-top: var(--space-2); margin-top: var(--space-2); }
+
+  .result { display: grid; place-items: center; outline: none; }
+  .result-card { max-width: 520px; width: 100%; text-align: center; background: var(--color-white); border-radius: var(--radius-xl); box-shadow: var(--shadow-lift); padding: clamp(1.5rem, 5vw, 3rem); display: grid; gap: var(--space-3); }
+  .result-card p { margin: 0; }
+  .ok-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #e3f2e9; color: var(--color-success); margin: 0 auto; }
+  .ok-icon :global(svg) { width: 34px; height: 34px; }
+  .code { font-family: var(--font-display); font-size: 2rem; font-weight: 800; color: var(--color-brand-dark); letter-spacing: 0.05em; }
+  .result-card .btn { margin-top: var(--space-2); }
+
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .summary { position: static; order: 2; }
+  }
+  @media (max-width: 600px) {
+    .choice-grid, .row { grid-template-columns: 1fr; }
+    .review :global(div) { grid-template-columns: 1fr auto; }
+    .review :global(dt) { grid-column: 1 / -1; }
+    .nav .btn { flex: 1; min-width: 0; }
+  }
+</style>

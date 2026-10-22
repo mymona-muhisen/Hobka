@@ -1,0 +1,11 @@
+{
+  // Cloudflare Worker for the Hobka order site.
+  // D1 (orders) and KV (children's photos, auto-deleted after 60 days) are created
+  // automatically on the first deploy because they have no ids here.
+  "name": "hobka",
+  "compatibility_date": "2026-10-01",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "d1_databases": [{ "binding": "DB", "database_name": "hobka-orders" }],
+  "kv_namespaces": [{ "binding": "PHOTOS" }],
+  "observability": { "enabled": true }
+}

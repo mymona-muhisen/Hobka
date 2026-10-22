@@ -1,0 +1,44 @@
+---
+import Base from '../../layouts/Base.astro';
+import Prose from '../../components/Prose.astro';
+import { timing, type Lang } from '../../config/catalog';
+export function getStaticPaths() { return [{ params: { lang: undefined } }, { params: { lang: 'en' } }]; }
+const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+---
+<Base lang={lang} title={lang === 'ar' ? 'شروط الطلب | حبكة' : 'Order terms | Hobka'} altPath={lang === 'ar' ? '/en/terms' : '/terms'}>
+  {lang === 'ar' ? (
+    <Prose title="شروط الطلب" lang="ar">
+      <h2>كيف يتم الطلب</h2>
+      <ol>
+        <li>ترسل الطلب من الموقع، دون أي دفع.</li>
+        <li>نرسل لك مسودة مجانية خلال {timing.draftDays.ar} على رابط خاص.</li>
+        <li>تراجع المسودة: تعتمدها، أو تكتب ملاحظاتك فنعدّلها ونرسل نسخة جديدة.</li>
+        <li>بعد الاعتماد تدفع المبلغ كاملاً بالتحويل (شام كاش أو حوالة)، وتصلك تفاصيل الدفع على واتساب.</li>
+        <li>نبدأ الطباعة بعد وصول الدفعة، وتستغرق {timing.printDays.ar}، ثم نوصل الطلب أو نشحنه.</li>
+      </ol>
+      <h2>الأسعار والشحن</h2>
+      <p>الأسعار بالدولار الأمريكي كما تظهر عند الطلب. تكلفة الشحن تختلف حسب المحافظة وتظهر قبل الإرسال.</p>
+      <h2>الإلغاء</h2>
+      <p>يمكنك إلغاء الطلب مجاناً في أي وقت قبل الدفع. بعد بدء الطباعة لا يمكن الإلغاء، لأن كل قصة تُصنع خصيصاً لطفلك.</p>
+      <h2>إذا وصل شيء تالفاً</h2>
+      <p>راسلنا على واتساب مع صورة للمشكلة فور الاستلام، وسنجد حلاً معك.</p>
+    </Prose>
+  ) : (
+    <Prose title="Order terms" lang="en">
+      <h2>How ordering works</h2>
+      <ol>
+        <li>You send the order from the website, with no payment.</li>
+        <li>We send a free draft within {timing.draftDays.en} on a private link.</li>
+        <li>You review the draft: approve it, or write your notes and we send an updated version.</li>
+        <li>After approval you pay the full amount by transfer (Sham Cash or remittance); payment details arrive on WhatsApp.</li>
+        <li>Printing starts once payment arrives and takes {timing.printDays.en}, then we deliver or ship.</li>
+      </ol>
+      <h2>Prices and shipping</h2>
+      <p>Prices are in US dollars as shown when ordering. Shipping depends on the governorate and is shown before sending.</p>
+      <h2>Cancellation</h2>
+      <p>You can cancel for free anytime before payment. Once printing starts, orders cannot be cancelled because each story is made for your child.</p>
+      <h2>If something arrives damaged</h2>
+      <p>Message us on WhatsApp with a photo of the problem right after delivery, and we will find a solution together.</p>
+    </Prose>
+  )}
+</Base>

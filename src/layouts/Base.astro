@@ -3,7 +3,7 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { ui } from '../i18n/ui';
-import type { Lang } from '../config/catalog';
+import { site, type Lang } from '../config/catalog';
 
 interface Props {
   lang: Lang;
@@ -16,6 +16,12 @@ interface Props {
 }
 const { lang, title, description, altPath, noindex = false, bare = false } = Astro.props;
 const t = ui[lang];
+const clean = (p: string) => { const x = p.replace(/(\/index)?\.html$/, '').replace(/\/$/, ''); return x || '/'; };
+const here = clean(Astro.url.pathname);
+const canonical = site.url + here;
+const arPath = lang === 'ar' ? here : altPath ? clean(altPath) : null;
+const enPath = lang === 'en' ? here : altPath ? clean(altPath) : null;
+const ogImage = `${site.url}/images/hero-book.webp`;
 ---
 <!doctype html>
 <html lang={lang} dir={t.dir}>
@@ -24,15 +30,29 @@ const t = ui[lang];
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {noindex ? <meta name="robots" content="noindex, nofollow" /> : <link rel="canonical" href={canonical} />}
+    {!noindex && arPath && <link rel="alternate" hreflang="ar" href={site.url + arPath} />}
+    {!noindex && enPath && <link rel="alternate" hreflang="en" href={site.url + enPath} />}
+    {!noindex && arPath && <link rel="alternate" hreflang="x-default" href={site.url + arPath} />}
+    {site.googleVerification && <meta name="google-site-verification" content={site.googleVerification} />}
     <meta name="theme-color" content="#771427" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/Tajawal-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/BalooBhaijaan2-ExtraBold.woff2" as="font" type="font/woff2" crossorigin />
     <meta property="og:title" content={title} />
     {description && <meta property="og:description" content={description} />}
-    <meta property="og:image" content="/images/hero-book.webp" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1400" />
+    <meta property="og:image:height" content="933" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={lang === 'ar' ? 'حبكة' : 'Hobka'} />
     <meta property="og:locale" content={lang === 'ar' ? 'ar_SY' : 'en_US'} />
+    <meta property="og:locale:alternate" content={lang === 'ar' ? 'en_US' : 'ar_SY'} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    {description && <meta name="twitter:description" content={description} />}
+    <meta name="twitter:image" content={ogImage} />
     <slot name="head" />
   </head>
   <body>

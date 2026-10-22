@@ -4,7 +4,9 @@ import Icon from '../../../components/Icon.astro';
 import { db, env, now, logEvent, type OrderRow } from '../../../lib/db';
 import { sameOrigin } from '../../../lib/auth';
 import { statuses, waLink, toIntl, type Status, type ChildInput } from '../../../lib/order';
-import { boxes, items, governorates, storyValues, artStyles, payment, timing, photoRetentionDays, type ItemId } from '../../../config/catalog';
+import { governorates, storyValues, artStyles, payment, timing, photoRetentionDays } from '../../../config/catalog';
+import { loadCatalog } from '../../../lib/catalog';
+import { orderLines, revenue, profit } from '../../../lib/orderLines';
 import { money } from '../../../lib/pricing';
 import { sanitizeImage } from '../../../lib/image';
 
@@ -39,6 +41,9 @@ if (Astro.request.method === 'POST') {
       const total = Math.round((o.subtotal - o.discount + ship) * 100) / 100;
       await d.prepare('UPDATE orders SET shipping = ?, total = ?, updated_at = ? WHERE id = ?').bind(ship, total, t, o.id).run();
       await logEvent(o.id, 'admin', 'shipping', `${o.shipping} ← ${ship}`);
+    } else if (action === 'costs') {
+      const num = (k: string) => { const v = Number(String(form.get(k) ?? '0').replace(',', '.')); if (!Number.isFinite(v) || v < 0 || v > 100000) throw new Error('قيمة تكلفة غير صحيحة.'); return Math.round(v * 100) / 100; };
+      await d.prepare('UPDATE orders SET cost_total = ?, extra_cost = ?, updated_at = ? WHERE id = ?').bind(num('cost_total'), num('extra_cost'), t, o.id).run();
     } else if (action === 'notes') {
       await d.prepare('UPDATE orders SET admin_notes = ?, updated_at = ? WHERE id = ?').bind(String(form.get('admin_notes') ?? '').slice(0, 4000), t, o.id).run();
     } else if (action === 'draft') {
@@ -75,8 +80,8 @@ if (Astro.request.method === 'POST') {
 const o = order!;
 const lang = o.site_lang === 'en' ? 'en' : 'ar';
 const child = o.child ? (JSON.parse(o.child) as ChildInput) : null;
-const addons = JSON.parse(o.addons) as ItemId[];
-const box = boxes.find((b) => b.id === o.box);
+const cat = await loadCatalog({ includeDeleted: true });
+const lines = orderLines(o, cat);
 const gov = governorates.find((g) => g.id === o.governorate);
 const { results: events } = await d.prepare('SELECT * FROM order_events WHERE order_id = ? ORDER BY id DESC LIMIT 50').bind(o.id).all<{ at: string; actor: string; type: string; note: string | null }>();
 const draftLink = `${Astro.url.origin}/d/${o.token}`;
@@ -207,8 +212,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
       <section class="apanel">
         <h2>الطلب والمبلغ</h2>
         <ul class="lines">
-          {box && <li><span>{box.name.ar}</span><span>{money(box.price)}</span></li>}
-          {addons.map((a) => <li><span>{items[a]?.name.ar ?? a}</span><span>{money(items[a]?.addonPrice ?? 0)}</span></li>)}
+          {lines.map((l) => <li><span>{l.name_ar}</span><span>{money(l.price)}</span></li>)}
           <li><span>الشحن ({gov?.name.ar})</span><span>{money(o.shipping)}</span></li>
           {o.discount > 0 && <li><span>خصم <span class="ltr">{o.discount_code}</span></span><span>−{money(o.discount)}</span></li>}
           <li class="total"><span>المجموع</span><span>{money(o.total)}</span></li>
@@ -220,6 +224,23 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
           <input id="ship" name="shipping" type="number" step="0.5" min="0" inputmode="decimal" value={o.shipping} />
           <button class="abtn" type="submit">تعديل الشحن</button>
         </form>
+      </section>
+
+      <section class="apanel">
+        <h2>الربح من هذا الطلب</h2>
+        <ul class="lines">
+          <li><span>المبيعات (بعد الخصم، بدون الشحن)</span><span>{money(revenue(o))}</span></li>
+          <li><span>تكلفة المنتجات</span><span>−{money(o.cost_total ?? 0)}</span></li>
+          <li><span>تكاليف إضافية</span><span>−{money(o.extra_cost ?? 0)}</span></li>
+          <li class:list={['total', { neg: profit(o) < 0 }]}><span>صافي الربح</span><span>{money(profit(o))}</span></li>
+        </ul>
+        <form method="post" class="costs">
+          <input type="hidden" name="action" value="costs" />
+          <label>تكلفة المنتجات<input name="cost_total" type="number" step="0.01" min="0" inputmode="decimal" value={o.cost_total ?? 0} /></label>
+          <label>تكاليف إضافية (تغليف، مواصلات…)<input name="extra_cost" type="number" step="0.01" min="0" inputmode="decimal" value={o.extra_cost ?? 0} /></label>
+          <button class="abtn" type="submit">حفظ التكاليف</button>
+        </form>
+        <p class="muted small">تكلفة المنتجات تُحسب تلقائياً من تكاليف المنتجات لحظة الطلب، ويمكنك تصحيحها هنا. الشحن لا يدخل في الربح لأنه يذهب لشركة الشحن.</p>
       </section>
 
       <section class="apanel">
@@ -295,6 +316,11 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
   .wa-list { display: grid; gap: 0.5rem; }
   .row { display: flex; gap: 0.5rem; }
   .row select { flex: 1; font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); }
+  .costs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: end; margin-top: 0.5rem; }
+  .costs label { display: grid; gap: 0.2rem; font-size: 0.85rem; font-weight: 600; }
+  .costs input { font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); width: 100%; }
+  .lines .neg { color: var(--color-error); }
+  @media (max-width: 520px) { .costs { grid-template-columns: 1fr; } }
   .ship input { flex: 1; font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); max-width: 140px; }
   .lines { list-style: none; padding: 0; margin: 0 0 0.5rem; display: grid; gap: 0.3rem; }
   .lines li { display: flex; justify-content: space-between; gap: 1rem; }

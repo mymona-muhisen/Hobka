@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { ages, boxes, governorates, items, maxValues, storyValues, artStyles, type ItemId, type Lang } from '../config/catalog';
+import { ages, governorates, maxValues, storyValues, artStyles, type Lang } from '../config/catalog';
 
-const itemIds = Object.keys(items) as [ItemId, ...ItemId[]];
+const productId = z.string().trim().regex(/^[a-z0-9-]{1,40}$/);
 const trim = (max: number) => z.string().trim().max(max);
 
 export const childSchema = z.object({
@@ -21,8 +21,8 @@ export const orderSchema = z
   .object({
     siteLang: z.enum(['ar', 'en']),
     kind: z.enum(['box', 'addons']),
-    box: z.enum(boxes.map((b) => b.id) as [string, ...string[]]).nullable().optional(),
-    addons: z.array(z.enum(itemIds)).max(10).default([]),
+    box: productId.nullable().optional(),
+    addons: z.array(productId).max(20).default([]),
     child: childSchema.nullable().optional(),
     photoMode: z.enum(['upload', 'whatsapp', 'none']).default('none'),
     photoConsent: z.boolean().default(false),

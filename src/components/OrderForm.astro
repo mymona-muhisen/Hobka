@@ -3,16 +3,19 @@ import Icon from './Icon.astro';
 import { orderUi } from '../i18n/order';
 import { fill, path } from '../i18n/ui';
 import {
-  boxes, items, governorates, storyValues, maxValues, maxPhotos, photoRetentionDays, ages, storyLanguages,
-  artStyles, stylesEnabled, timing, pricesAreFinal, type Lang,
+  governorates, storyValues, maxValues, maxPhotos, photoRetentionDays, ages, storyLanguages,
+  artStyles, stylesEnabled, timing, pricesAreFinal, type Lang, type Catalog,
 } from '../config/catalog';
-import { money } from '../lib/pricing';
+import { money, publicCatalog } from '../lib/pricing';
 
-interface Props { lang: Lang }
+interface Props { lang: Lang; catalog: Catalog }
 const { lang } = Astro.props;
+const catalog = publicCatalog(Astro.props.catalog);
+const items = catalog.items;
+const boxes = catalog.boxes;
 const t = orderUi[lang];
 const days = photoRetentionDays;
-const addonItems = Object.values(items).filter((i) => i.status === 'available' && i.addonPrice !== null);
+const addonItems = Object.values(items).filter((i) => i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
 const ageList = Array.from({ length: ages.max - ages.min + 1 }, (_, i) => ages.min + i);
 const privacyHref = path(lang, '/privacy');
 const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, maxValues, pricesAreFinal };
@@ -298,11 +301,16 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   </section>
 </div>
 
-<script type="application/json" id="order-strings" set:html={JSON.stringify(strings)} />
+<script type="application/json" id="order-strings" set:html={JSON.stringify(strings).replace(/</g, '\\u003c')} />
+<script type="application/json" id="order-catalog" set:html={JSON.stringify(catalog).replace(/</g, '\\u003c')} />
 
 <script>
-  import { boxes, items, governorates, storyValues, maxValues, maxPhotos, type ItemId } from '../config/catalog';
+  import { governorates, storyValues, maxValues, maxPhotos, type ItemId, type Catalog } from '../config/catalog';
   import { computePrice, allowedAddons, money, type Discount } from '../lib/pricing';
+
+  const CAT = JSON.parse(document.getElementById('order-catalog')!.textContent!) as Catalog;
+  const items = CAT.items;
+  const boxes = CAT.boxes;
 
   type S = Record<string, string | number | boolean | readonly string[]> & { steps: readonly string[]; lang: 'ar' | 'en' };
   const S = JSON.parse(document.getElementById('order-strings')!.textContent!) as S;
@@ -467,7 +475,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   // ───────── add-ons depend on the box
   function prepareAddons() {
     const box = isOnly() ? null : (radio('box') as never);
-    const ok = new Set(allowedAddons(isOnly() ? 'addons' : 'box', box));
+    const ok = new Set(allowedAddons(CAT, isOnly() ? 'addons' : 'box', box));
     let visible = 0;
     form.querySelectorAll<HTMLElement>('.addon').forEach((el) => {
       const show = ok.has(el.dataset.addon as ItemId);
@@ -536,7 +544,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   function priceNow() {
     const b = radio('box');
     if (!b) return null;
-    return computePrice({ kind: b === 'only' ? 'addons' : 'box', box: b === 'only' ? null : (b as never), addons: checked('addons') as ItemId[], governorate: val('governorate') }, discount);
+    return computePrice(CAT, { kind: b === 'only' ? 'addons' : 'box', box: b === 'only' ? null : (b as never), addons: checked('addons') as ItemId[], governorate: val('governorate') }, discount);
   }
   const lineName = (id: string) => {
     const [kind, key] = id.split(':');

@@ -2,8 +2,10 @@
 import Admin from '../../layouts/Admin.astro';
 import { db, type OrderRow } from '../../lib/db';
 import { statuses, type Status } from '../../lib/order';
-import { boxes, governorates } from '../../config/catalog';
+import { governorates } from '../../config/catalog';
 import { money } from '../../lib/pricing';
+import { loadCatalog } from '../../lib/catalog';
+import { orderLines, profit, PAID } from '../../lib/orderLines';
 
 export const prerender = false;
 
@@ -23,12 +25,27 @@ const sql = `SELECT * FROM orders ${where.length ? 'WHERE ' + where.join(' AND '
 const { results: orders } = await d.prepare(sql).bind(...binds).all<OrderRow>();
 const { results: counts } = await d.prepare('SELECT status, COUNT(*) AS n FROM orders GROUP BY status').all<{ status: string; n: number }>();
 const count = Object.fromEntries(counts.map((c) => [c.status, c.n]));
+const cat = await loadCatalog({ includeDeleted: true });
+const boxName = (o: OrderRow) => orderLines(o, cat).find((l) => l.kind === 'box')?.name_ar ?? '';
+// Money summary (shipping excluded: it goes to the delivery company)
+const paidIn = PAID.map(() => '?').join(',');
+const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString();
+const sumSql = `SELECT COUNT(*) AS n, COALESCE(SUM(subtotal - discount), 0) AS rev, COALESCE(SUM(subtotal - discount - cost_total - extra_cost), 0) AS prof FROM orders`;
+type Sum = { n: number; rev: number; prof: number };
+const month = (await d.prepare(`${sumSql} WHERE status IN (${paidIn}) AND created_at >= ?`).bind(...PAID, monthStart).first<Sum>())!;
+const allPaid = (await d.prepare(`${sumSql} WHERE status IN (${paidIn})`).bind(...PAID).first<Sum>())!;
+const pending = (await d.prepare(`${sumSql} WHERE status NOT IN (${paidIn}, 'cancelled')`).bind(...PAID).first<Sum>())!;
 const openCount = counts.filter((c) => !['delivered', 'cancelled'].includes(c.status)).reduce((s, c) => s + c.n, 0);
 const fmtDate = (iso: string) => new Date(iso).toLocaleString('ar-SY', { timeZone: 'Asia/Damascus', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: string }).name : '—');
 ---
 <Admin title="الطلبات">
   <h1>الطلبات</h1>
+  <div class="stats">
+    <div class="apanel stat"><span class="muted">ربح هذا الشهر (مدفوعة)</span><strong>{money(month.prof)}</strong><span class="muted small">{month.n} طلب · مبيعات {money(month.rev)}</span></div>
+    <div class="apanel stat"><span class="muted">الربح الكلي (مدفوعة)</span><strong>{money(allPaid.prof)}</strong><span class="muted small">{allPaid.n} طلب · مبيعات {money(allPaid.rev)}</span></div>
+    <div class="apanel stat"><span class="muted">ربح متوقع (لم تُدفع بعد)</span><strong>{money(pending.prof)}</strong><span class="muted small">{pending.n} طلب</span></div>
+  </div>
   <form class="filters" method="get">
     <select name="status" aria-label="الحالة" onchange="this.form.submit()">
       <option value="open" selected={status === 'open'}>المفتوحة ({openCount})</option>
@@ -52,11 +69,11 @@ const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: st
             </span>
             <span class="c2">
               <strong>{o.parent_name}</strong>
-              <span class="muted">{o.kind === 'box' ? `${boxes.find((b) => b.id === o.box)?.name.ar ?? ''} · ${childName(o)}` : 'منتجات منفردة'} · {governorates.find((g) => g.id === o.governorate)?.name.ar}</span>
+              <span class="muted">{o.kind === 'box' ? `${boxName(o)} · ${childName(o)}` : 'منتجات منفردة'} · {governorates.find((g) => g.id === o.governorate)?.name.ar}</span>
             </span>
             <span class="c3">
               <span class={`st st-${o.status}`}>{statuses[o.status as Status]?.ar ?? o.status}</span>
-              <span>{money(o.total)}{o.photo_count > 0 ? ' · 📷' : o.photo_mode === 'whatsapp' ? ' · 📷 واتساب' : ''}</span>
+              <span>{money(o.total)} · <span class:list={['pf', { neg: profit(o) < 0 }]}>ربح {money(profit(o))}</span>{o.photo_count > 0 ? ' · 📷' : o.photo_mode === 'whatsapp' ? ' · 📷 واتساب' : ''}</span>
             </span>
           </a>
         </li>
@@ -65,6 +82,13 @@ const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: st
   )}
 </Admin>
 <style>
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 0.5rem; }
+  .stat { display: grid; gap: 0.15rem; margin-bottom: 0.5rem; }
+  .stat strong { font-family: var(--font-display); font-size: 1.6rem; color: var(--color-brand-dark); }
+  .small { font-size: 0.82rem; }
+  .pf { display: inline !important; color: var(--color-success); }
+  .pf.neg { color: var(--color-error); }
+  @media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }
   .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .filters select, .filters input { font: inherit; padding: 0.5rem 0.8rem; border: 1.5px solid var(--color-border); border-radius: 99px; background: #fff; min-height: 44px; }
   .filters input { flex: 1; min-width: 200px; }

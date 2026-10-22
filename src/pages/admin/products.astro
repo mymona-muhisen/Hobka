@@ -1,0 +1,217 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import { sameOrigin } from '../../lib/auth';
+import { loadCatalog, saveProduct, deleteProduct } from '../../lib/catalog';
+import { money } from '../../lib/pricing';
+import type { Box, Item } from '../../config/catalog';
+
+export const prerender = false;
+
+let error = '';
+const flash = Astro.url.searchParams.get('ok') ?? '';
+const PROTECTED = new Set(['story']); // the story itself can't be removed
+
+function slug(s: string) {
+  return s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+}
+const randId = () => 'p-' + Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 6);
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  const f = await Astro.request.formData();
+  const g = (k: string) => String(f.get(k) ?? '').trim();
+  const num = (k: string, opt = false): number | null => {
+    const raw = g(k).replace(',', '.');
+    if (raw === '' && opt) return null;
+    const v = Number(raw || '0');
+    if (!Number.isFinite(v) || v < 0 || v > 100000) throw new Error('رقم غير صحيح في حقل السعر أو التكلفة.');
+    return Math.round(v * 100) / 100;
+  };
+  const action = g('action');
+  try {
+    const cat = await loadCatalog({ includeDeleted: true });
+    if (action === 'save_item' || action === 'new_item') {
+      if (!g('name_ar')) throw new Error('اسم المنتج بالعربية مطلوب.');
+      let id = g('id');
+      if (action === 'new_item') {
+        id = slug(g('name_en')) || randId();
+        if (cat.items[id] || cat.deleted.has(`item:${id}`)) id = `${id.slice(0, 22)}-${randId().slice(2)}`;
+      } else if (!cat.items[id]) throw new Error('المنتج غير موجود.');
+      const status = (['available', 'soon', 'hidden'].includes(g('status')) ? g('status') : 'available') as Item['status'];
+      const item: Item = {
+        id,
+        name: { ar: g('name_ar'), en: g('name_en') || g('name_ar') },
+        desc: { ar: g('desc_ar'), en: g('desc_en') || g('desc_ar') },
+        addonPrice: num('addonPrice', true),
+        cost: num('cost')!,
+        status,
+        standalone: f.get('standalone') === 'on',
+        personalized: f.get('personalized') === 'on',
+        sort: Math.floor(num('sort')!),
+      };
+      await saveProduct('item', item);
+    } else if (action === 'save_box' || action === 'new_box') {
+      if (!g('name_ar')) throw new Error('اسم الصندوق بالعربية مطلوب.');
+      let id = g('id');
+      if (action === 'new_box') {
+        id = slug(g('name_en')) || randId();
+        if (cat.boxes.some((b) => b.id === id) || cat.deleted.has(`box:${id}`)) id = `${id.slice(0, 22)}-${randId().slice(2)}`;
+      } else if (!cat.boxes.some((b) => b.id === id)) throw new Error('الصندوق غير موجود.');
+      const includes = f.getAll('includes').map(String).filter((x) => cat.items[x]);
+      if (!includes.includes('story')) includes.unshift('story');
+      const box: Box = {
+        id,
+        name: { ar: g('name_ar'), en: g('name_en') || g('name_ar') },
+        tagline: { ar: g('tagline_ar'), en: g('tagline_en') || g('tagline_ar') },
+        price: num('price')!,
+        cost: num('cost')!,
+        includes,
+        popular: f.get('popular') === 'on',
+        status: g('status') === 'hidden' ? 'hidden' : 'available',
+        sort: Math.floor(num('sort')!),
+      };
+      await saveProduct('box', box);
+    } else if (action === 'delete_item' || action === 'delete_box') {
+      const id = g('id');
+      if (action === 'delete_item' && PROTECTED.has(id)) throw new Error('لا يمكن حذف القصة لأنها أساس كل صندوق.');
+      await deleteProduct(action === 'delete_item' ? 'item' : 'box', id);
+    } else throw new Error('إجراء غير معروف');
+    return Astro.redirect('/admin/products?ok=' + encodeURIComponent('تم الحفظ ✓'), 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+const cat = await loadCatalog();
+const items = Object.values(cat.items).sort((a, b) => a.sort - b.sort);
+const boxes = cat.boxes;
+const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخفي' } as const;
+---
+<Admin title="المنتجات">
+  <h1>المنتجات والصناديق</h1>
+  {flash && <p class="flash">{flash}</p>}
+  {error && <p class="flash bad" role="alert">{error}</p>}
+  <p class="muted">التغييرات تظهر في الموقع فوراً. الطلبات القديمة تبقى بأسعارها وتكاليفها كما كانت لحظة الطلب. «التكلفة» هي ما يكلّفك تجهيزه، وتُستخدم لحساب الربح ولا تظهر للعملاء.</p>
+
+  <h2 class="sec">الصناديق</h2>
+  {boxes.map((b) => (
+    <details class="apanel prod">
+      <summary>
+        <strong>{b.name.ar}</strong>
+        <span class="muted">{money(b.price)} · تكلفة {money(b.cost ?? 0)} · ربح {money(b.price - (b.cost ?? 0))}</span>
+        {b.status === 'hidden' && <span class="st st-cancelled">مخفي</span>}
+        {b.popular && <span class="st">الأكثر اختياراً</span>}
+      </summary>
+      <form method="post" class="pform">
+        <input type="hidden" name="action" value="save_box" /><input type="hidden" name="id" value={b.id} />
+        <label>الاسم (عربي)<input name="name_ar" value={b.name.ar} required /></label>
+        <label>الاسم (إنجليزي)<input name="name_en" value={b.name.en} dir="ltr" /></label>
+        <label class="wide">الوصف القصير (عربي)<input name="tagline_ar" value={b.tagline.ar} /></label>
+        <label class="wide">الوصف القصير (إنجليزي)<input name="tagline_en" value={b.tagline.en} dir="ltr" /></label>
+        <label>السعر $<input name="price" type="number" step="0.5" min="0" value={b.price} required /></label>
+        <label>التكلفة $<input name="cost" type="number" step="0.01" min="0" value={b.cost ?? 0} /></label>
+        <label>الترتيب<input name="sort" type="number" step="1" min="0" value={b.sort} /></label>
+        <label>الحالة<select name="status"><option value="available" selected={b.status !== 'hidden'}>ظاهر</option><option value="hidden" selected={b.status === 'hidden'}>مخفي</option></select></label>
+        <fieldset class="wide"><legend>محتويات الصندوق</legend>
+          {items.map((it) => <label class="cb"><input type="checkbox" name="includes" value={it.id} checked={b.includes.includes(it.id)} disabled={it.id === 'story'} />{it.name.ar}{it.status !== 'available' && ` (${statusLabel[it.status]})`}</label>)}
+        </fieldset>
+        <label class="cb wide"><input type="checkbox" name="popular" checked={!!b.popular} />شارة «الأكثر اختياراً»</label>
+        <div class="acts wide"><button class="abtn primary" type="submit">حفظ</button></div>
+      </form>
+      <form method="post" class="del" onsubmit="return confirm('حذف هذا الصندوق من الموقع؟ الطلبات القديمة لن تتأثر.')">
+        <input type="hidden" name="action" value="delete_box" /><input type="hidden" name="id" value={b.id} />
+        <button class="abtn danger" type="submit">حذف الصندوق</button>
+      </form>
+    </details>
+  ))}
+  <details class="apanel prod new">
+    <summary><strong>+ إضافة صندوق جديد</strong></summary>
+    <form method="post" class="pform">
+      <input type="hidden" name="action" value="new_box" />
+      <label>الاسم (عربي)<input name="name_ar" required /></label>
+      <label>الاسم (إنجليزي)<input name="name_en" dir="ltr" /></label>
+      <label class="wide">الوصف القصير (عربي)<input name="tagline_ar" /></label>
+      <label class="wide">الوصف القصير (إنجليزي)<input name="tagline_en" dir="ltr" /></label>
+      <label>السعر $<input name="price" type="number" step="0.5" min="0" required /></label>
+      <label>التكلفة $<input name="cost" type="number" step="0.01" min="0" value="0" /></label>
+      <label>الترتيب<input name="sort" type="number" step="1" min="0" value={boxes.length + 1} /></label>
+      <label>الحالة<select name="status"><option value="available">ظاهر</option><option value="hidden">مخفي</option></select></label>
+      <fieldset class="wide"><legend>محتويات الصندوق (القصة دائماً موجودة)</legend>
+        {items.map((it) => <label class="cb"><input type="checkbox" name="includes" value={it.id} checked={it.id === 'story'} disabled={it.id === 'story'} />{it.name.ar}</label>)}
+      </fieldset>
+      <label class="cb wide"><input type="checkbox" name="popular" />شارة «الأكثر اختياراً»</label>
+      <div class="acts wide"><button class="abtn primary" type="submit">إضافة الصندوق</button></div>
+    </form>
+  </details>
+
+  <h2 class="sec">المنتجات</h2>
+  {items.map((it) => (
+    <details class="apanel prod">
+      <summary>
+        <strong>{it.name.ar}</strong>
+        <span class="muted">{it.addonPrice === null ? 'داخل الصناديق فقط' : `${money(it.addonPrice)} كإضافة`} · تكلفة {money(it.cost ?? 0)}</span>
+        {it.status !== 'available' && <span class="st st-cancelled">{statusLabel[it.status]}</span>}
+        {it.standalone && <span class="st">يُباع منفرداً</span>}
+      </summary>
+      <form method="post" class="pform">
+        <input type="hidden" name="action" value="save_item" /><input type="hidden" name="id" value={it.id} />
+        <label>الاسم (عربي)<input name="name_ar" value={it.name.ar} required /></label>
+        <label>الاسم (إنجليزي)<input name="name_en" value={it.name.en} dir="ltr" /></label>
+        <label class="wide">الوصف (عربي)<textarea name="desc_ar" rows="2">{it.desc.ar}</textarea></label>
+        <label class="wide">الوصف (إنجليزي)<textarea name="desc_en" rows="2" dir="ltr">{it.desc.en}</textarea></label>
+        <label>سعر الإضافة $ <span class="muted">(فارغ = داخل الصناديق فقط)</span><input name="addonPrice" type="number" step="0.5" min="0" value={it.addonPrice ?? ''} /></label>
+        <label>التكلفة $<input name="cost" type="number" step="0.01" min="0" value={it.cost ?? 0} /></label>
+        <label>الترتيب<input name="sort" type="number" step="1" min="0" value={it.sort} /></label>
+        <label>الحالة<select name="status">{(['available', 'soon', 'hidden'] as const).map((s) => <option value={s} selected={it.status === s}>{statusLabel[s]}</option>)}</select></label>
+        <label class="cb"><input type="checkbox" name="standalone" checked={it.standalone} />يُباع منفرداً لأي أحد (بدون قصة)</label>
+        <label class="cb"><input type="checkbox" name="personalized" checked={it.personalized} />مخصّص (يحتاج بيانات الطفل)</label>
+        <div class="acts wide"><button class="abtn primary" type="submit">حفظ</button></div>
+      </form>
+      {it.id !== 'story' && (
+        <form method="post" class="del" onsubmit="return confirm('حذف هذا المنتج من الموقع ومن كل الصناديق؟ الطلبات القديمة لن تتأثر.')">
+          <input type="hidden" name="action" value="delete_item" /><input type="hidden" name="id" value={it.id} />
+          <button class="abtn danger" type="submit">حذف المنتج</button>
+        </form>
+      )}
+    </details>
+  ))}
+  <details class="apanel prod new">
+    <summary><strong>+ إضافة منتج جديد</strong></summary>
+    <form method="post" class="pform">
+      <input type="hidden" name="action" value="new_item" />
+      <label>الاسم (عربي)<input name="name_ar" required /></label>
+      <label>الاسم (إنجليزي)<input name="name_en" dir="ltr" /></label>
+      <label class="wide">الوصف (عربي)<textarea name="desc_ar" rows="2"></textarea></label>
+      <label class="wide">الوصف (إنجليزي)<textarea name="desc_en" rows="2" dir="ltr"></textarea></label>
+      <label>سعر الإضافة $ <span class="muted">(فارغ = داخل الصناديق فقط)</span><input name="addonPrice" type="number" step="0.5" min="0" /></label>
+      <label>التكلفة $<input name="cost" type="number" step="0.01" min="0" value="0" /></label>
+      <label>الترتيب<input name="sort" type="number" step="1" min="0" value={items.length + 1} /></label>
+      <label>الحالة<select name="status"><option value="available">متاح</option><option value="soon">قريباً</option><option value="hidden">مخفي</option></select></label>
+      <label class="cb"><input type="checkbox" name="standalone" />يُباع منفرداً لأي أحد (بدون قصة)</label>
+      <label class="cb"><input type="checkbox" name="personalized" />مخصّص (يحتاج بيانات الطفل)</label>
+      <div class="acts wide"><button class="abtn primary" type="submit">إضافة المنتج</button></div>
+    </form>
+    <p class="muted small">بعد الإضافة، اختاري الصناديق التي يدخل فيها من قسم «الصناديق».</p>
+  </details>
+</Admin>
+<style>
+  .sec { font-family: var(--font-body); font-size: 1.15rem; font-weight: 800; margin: 1.5rem 0 0.75rem; }
+  .prod { padding: 0; overflow: hidden; }
+  .prod summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; padding: 1rem 1.25rem; list-style: none; }
+  .prod summary::-webkit-details-marker { display: none; }
+  .prod summary::before { content: '›'; font-size: 1.4rem; color: var(--color-brand); transition: transform .15s; }
+  .prod[open] summary::before { transform: rotate(90deg); }
+  .prod.new summary { color: var(--color-brand); }
+  .pform { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; padding: 0 1.25rem 1rem; }
+  .pform label { display: grid; gap: 0.25rem; font-weight: 600; font-size: 0.92rem; }
+  .pform input:not([type='checkbox']), .pform select, .pform textarea { font: inherit; font-weight: 400; padding: 0.55rem 0.75rem; border: 1.5px solid var(--color-border); border-radius: 12px; background: var(--color-paper); width: 100%; }
+  .pform .wide { grid-column: 1 / -1; }
+  .pform fieldset { border: 1px solid var(--color-border); border-radius: 12px; padding: 0.5rem 0.9rem 0.8rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+  .pform legend { font-weight: 700; font-size: 0.92rem; padding: 0 0.3rem; }
+  .cb { display: flex !important; align-items: center; gap: 0.5rem; font-weight: 500 !important; }
+  .cb input { width: 18px; height: 18px; accent-color: var(--color-brand); }
+  .acts { display: flex; gap: 0.5rem; }
+  .del { padding: 0 1.25rem 1.25rem; }
+  .small { font-size: 0.85rem; padding: 0 1.25rem 1rem; }
+  @media (max-width: 640px) { .pform { grid-template-columns: 1fr; } }
+</style>

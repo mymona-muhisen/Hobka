@@ -1,6 +1,6 @@
 /**
- * ملف الإعدادات الوحيد الذي تحتاجين تعديله:
- * الأسعار، الصناديق، الإضافات، القيم، تكاليف الشحن، رقم الواتساب والروابط.
+ * إعدادات الموقع: القيم، تكاليف الشحن، رقم الواتساب والروابط، نص الدفع.
+ * المنتجات والصناديق وأسعارها وتكاليفها تُدار من لوحة الإدارة: /admin/products
  *
  * ⚠️ كل الأسعار هنا مؤقتة (PLACEHOLDER) إلى أن تصل الأرقام الحقيقية.
  * بعد أي تعديل: احفظي الملف وارفعيه إلى GitHub، فيُعاد نشر الموقع تلقائياً.
@@ -10,6 +10,12 @@ export type Text = { ar: string; en: string };
 export type Lang = 'ar' | 'en';
 
 // ─────────────────────────────── التواصل
+/** عنوان الموقع الأساسي (غيّريه عند شراء دومين) ورمز التحقق من Google Search Console إن وُجد */
+export const site = {
+  url: 'https://hobka.mhmymona.workers.dev',
+  googleVerification: '',
+};
+
 export const contact = {
   /** رقم الواتساب بالصيغة الدولية بدون + أو أصفار في البداية */
   whatsapp: '963968190380',
@@ -17,7 +23,7 @@ export const contact = {
   instagram: 'https://www.instagram.com/hobka_stories',
   facebook: 'https://www.facebook.com/share/1LoyHFnMCw/',
   /** صفحة الصورة مع حبّوك (AR) */
-  arUrl: 'https://hobka.pages.dev',
+  arUrl: '/ar/',
 };
 
 // ─────────────────────────────── الدفع (يُرسل للعميل على واتساب بعد اعتماد المسودة)
@@ -38,16 +44,12 @@ export const timing = {
 /** هل الأسعار نهائية؟ اجعليها true عندما تضعين الأسعار الحقيقية (تختفي ملاحظة "أسعار مبدئية"). */
 export const pricesAreFinal = false;
 
-// ─────────────────────────────── المنتجات
-export type ItemId =
-  | 'story'
-  | 'stickers'
-  | 'letter'
-  | 'cards'
-  | 'planting'
-  | 'puzzle'
-  | 'figure3d'
-  | 'newspaper';
+// ─────────────────────────────── المنتجات والصناديق
+// ⚠️ صارت المنتجات والصناديق تُدار من لوحة الإدارة (/admin/products).
+// القيم هنا هي البداية فقط: تُنسخ إلى قاعدة البيانات أول مرة يعمل فيها الموقع، وبعدها لا تُقرأ من هنا.
+export type ItemId = string;
+export type BoxId = string;
+export type ItemStatus = 'available' | 'soon' | 'hidden';
 
 export interface Item {
   id: ItemId;
@@ -55,17 +57,40 @@ export interface Item {
   desc: Text;
   /** شخصي (يحتاج بيانات الطفل) أم ثابت */
   personalized: boolean;
-  /** متاح الآن، أو "قريباً" */
-  status: 'available' | 'soon';
+  /** متاح، قريباً، أو مخفي */
+  status: ItemStatus;
   /** سعر الإضافة منفردة (بالدولار). null = لا تُباع منفردة */
   addonPrice: number | null;
   /** تُباع لأي أحد بدون قصة */
   standalone: boolean;
+  /** كلفة تصنيعك للقطعة عند بيعها كإضافة (لحساب الربح) */
+  cost: number;
+  sort: number;
 }
 
-export const items: Record<ItemId, Item> = {
+export interface Box {
+  id: BoxId;
+  name: Text;
+  tagline: Text;
+  price: number;
+  /** كلفة تجهيز الصندوق كاملاً (لحساب الربح) */
+  cost: number;
+  includes: ItemId[];
+  popular?: boolean;
+  status: 'available' | 'hidden';
+  sort: number;
+}
+
+export interface Catalog {
+  items: Record<ItemId, Item>;
+  boxes: Box[];
+}
+
+export const defaultItems: Record<ItemId, Item> = {
   story: {
     id: 'story',
+    cost: 0, // PLACEHOLDER
+    sort: 1,
     name: { ar: 'القصة المخصّصة المطبوعة', en: 'Personalized printed story' },
     desc: { ar: 'كتاب مطبوع بطله طفلك، باسمه وملامحه وقيمته المختارة.', en: 'A printed book starring your child: their name, look and chosen value.' },
     personalized: true,
@@ -75,6 +100,8 @@ export const items: Record<ItemId, Item> = {
   },
   stickers: {
     id: 'stickers',
+    cost: 0, // PLACEHOLDER
+    sort: 2,
     name: { ar: 'ستيكرات بطل القصة', en: 'Story hero stickers' },
     desc: { ar: 'ورقة ستيكرات لطفلك بشكله الكرتوني من القصة.', en: "A sticker sheet of your child's cartoon self from the story." },
     personalized: true,
@@ -84,6 +111,8 @@ export const items: Record<ItemId, Item> = {
   },
   letter: {
     id: 'letter',
+    cost: 0, // PLACEHOLDER
+    sort: 3,
     name: { ar: 'رسالة حبّوك السرية', en: 'Habbouk’s secret letter' },
     desc: { ar: 'مغلّف مختوم فيه رسالة من حبّوك باسم طفلك، يمنحه فيها درع الشجاعة وتاج البطولة.', en: 'A sealed envelope with a letter from Habbouk to your child by name, awarding the shield of courage and the crown of heroes.' },
     personalized: true,
@@ -93,6 +122,8 @@ export const items: Record<ItemId, Item> = {
   },
   cards: {
     id: 'cards',
+    cost: 0, // PLACEHOLDER
+    sort: 4,
     name: { ar: 'بطاقات حبكتك', en: 'Hobka Talk cards' },
     desc: { ar: 'بطاقات «ذاكرة وتراث» يسأل فيها طفلك جدّه وجدّته عن طفولتهما، وبطاقات «مهمة» فيها تحديات صغيرة ممتعة. تقرّب العائلة وتبني ثقة الطفل وحواره، ومستوحاة من العلاج السلوكي المعرفي.', en: '“Memory & heritage” cards where your child asks their grandparents about their childhood, and “Mission” cards with small fun challenges. They bring the family closer and build confidence and conversation, inspired by CBT.' },
     personalized: false,
@@ -102,6 +133,8 @@ export const items: Record<ItemId, Item> = {
   },
   planting: {
     id: 'planting',
+    cost: 0, // PLACEHOLDER
+    sort: 5,
     name: { ar: 'عدّة الزراعة «حديقتي مع حبّوك»', en: '"My garden with Habbouk" planting kit' },
     desc: { ar: 'بروشور وبذور وأصيص صغير، ليزرع طفلك نبتته ويعتني بها.', en: 'A guide, seeds and a small pot so your child can grow and care for a plant.' },
     personalized: false,
@@ -111,8 +144,10 @@ export const items: Record<ItemId, Item> = {
   },
   puzzle: {
     id: 'puzzle',
-    name: { ar: 'بازل غلاف القصة', en: 'Story cover puzzle' },
-    desc: { ar: 'بازل مطبوع من غلاف قصة طفلك.', en: "A jigsaw puzzle printed from your child's story cover." },
+    cost: 0, // PLACEHOLDER
+    sort: 6,
+    name: { ar: 'بازل بصورة طفلك', en: 'Puzzle with your child’s picture' },
+    desc: { ar: 'بازل مطبوع بصورة طفلك.', en: "A jigsaw puzzle printed with your child's picture." },
     personalized: true,
     status: 'available',
     addonPrice: 10,
@@ -120,6 +155,8 @@ export const items: Record<ItemId, Item> = {
   },
   figure3d: {
     id: 'figure3d',
+    cost: 0, // PLACEHOLDER
+    sort: 7,
     name: { ar: 'مجسّم حبّوك', en: 'Habbouk figure' },
     desc: { ar: 'حبّوك مطبوعاً بطابعة ثلاثية الأبعاد.', en: 'Habbouk, 3D printed.' },
     personalized: false,
@@ -129,6 +166,8 @@ export const items: Record<ItemId, Item> = {
   },
   newspaper: {
     id: 'newspaper',
+    cost: 0, // PLACEHOLDER
+    sort: 8,
     name: { ar: 'جريدة نشاطات حبّوك', en: "Habbouk's activity paper" },
     desc: { ar: 'متاهات وألغاز ونشاطات ممتعة.', en: 'Mazes, riddles and fun activities.' },
     personalized: false,
@@ -138,42 +177,41 @@ export const items: Record<ItemId, Item> = {
   },
 };
 
-// ─────────────────────────────── الصناديق
-export type BoxId = 'story' | 'hobka' | 'full';
-
-export interface Box {
-  id: BoxId;
-  name: Text;
-  tagline: Text;
-  price: number;
-  includes: ItemId[];
-  popular?: boolean;
-}
-
-export const boxes: Box[] = [
+export const defaultBoxes: Box[] = [
   {
     id: 'story',
     name: { ar: 'صندوق القصة', en: 'Story box' },
     tagline: { ar: 'البداية: قصة طفلك وستيكراته', en: "The start: your child's story and stickers" },
     price: 25, // PLACEHOLDER
+    cost: 0, // PLACEHOLDER
     includes: ['story', 'stickers', 'letter'],
+    status: 'available',
+    sort: 1,
   },
   {
     id: 'hobka',
     name: { ar: 'صندوق حبكة', en: 'Hobka box' },
     tagline: { ar: 'الأكثر اختياراً: قصة ونشاطات تكمل الحكاية', en: 'Most chosen: the story plus activities that continue it' },
     price: 35, // PLACEHOLDER
+    cost: 0, // PLACEHOLDER
     includes: ['story', 'stickers', 'letter', 'cards', 'planting'],
     popular: true,
+    status: 'available',
+    sort: 2,
   },
   {
     id: 'full',
     name: { ar: 'الصندوق الكامل', en: 'Full box' },
-    tagline: { ar: 'كل شيء، مع بازل غلاف القصة', en: 'Everything, plus the story cover puzzle' },
+    tagline: { ar: 'كل شيء، مع بازل بصورة طفلك', en: 'Everything, plus a puzzle with your child’s picture' },
     price: 45, // PLACEHOLDER
+    cost: 0, // PLACEHOLDER
     includes: ['story', 'stickers', 'letter', 'cards', 'planting', 'puzzle', 'figure3d', 'newspaper'],
+    status: 'available',
+    sort: 3,
   },
 ];
+
+export const defaultCatalog: Catalog = { items: defaultItems, boxes: defaultBoxes };
 
 // ─────────────────────────────── الشحن (لكل محافظة، بالدولار)
 // ⚠️ أسعار تقريبية: السعر النهائي تحدده شركة الشحن، ويمكنك تعديله لكل طلب من لوحة الإدارة.

@@ -1,15 +1,49 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { loadCatalog } from '../../lib/catalog';
 import Home from '../../components/Home.astro';
-import { ui } from '../../i18n/ui';
+import { ui, fill } from '../../i18n/ui';
+import { contact, site, timing, photoRetentionDays } from '../../config/catalog';
 import type { Lang } from '../../config/catalog';
 
-export function getStaticPaths() {
-  return [{ params: { lang: undefined } }, { params: { lang: 'en' } }];
-}
+export const prerender = false;
+if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const catalog = await loadCatalog();
 const t = ui[lang];
+const vars = { draft: timing.draftDays[lang], print: timing.printDays[lang], days: photoRetentionDays };
+const ld = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${site.url}/#org`,
+    name: lang === 'ar' ? 'حبكة' : 'Hobka',
+    alternateName: ['حبكة', 'Hobka', 'hobka stories', 'حبكة قصص أطفال'],
+    url: site.url,
+    logo: `${site.url}/brand/logo-brand.svg`,
+    description: t.meta.homeDesc,
+    areaServed: { '@type': 'Country', name: 'Syria' },
+    sameAs: [contact.instagram, contact.facebook],
+    contactPoint: { '@type': 'ContactPoint', telephone: '+' + contact.whatsapp, contactType: 'customer service', availableLanguage: ['ar', 'en'] },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${site.url}/#website`,
+    url: site.url,
+    name: lang === 'ar' ? 'حبكة' : 'Hobka',
+    inLanguage: lang,
+    publisher: { '@id': `${site.url}/#org` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    inLanguage: lang,
+    mainEntity: t.faq.items.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: fill(f.a, vars) } })),
+  },
+];
 ---
 <Base lang={lang} title={t.meta.homeTitle} description={t.meta.homeDesc} altPath={lang === 'ar' ? '/en' : '/'}>
-  <Home lang={lang} />
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
+  <Home lang={lang} catalog={catalog} />
 </Base>

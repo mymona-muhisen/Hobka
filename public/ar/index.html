@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#771427">
+<title>صورة مع حبّوك | حبكة</title>
+<meta name="description" content="افتح الكاميرا والتقط صورة مع حبّوك، صديق طفلك من قصص حبكة المخصّصة. بدون تطبيق، والصورة تُصنع على هاتفك فقط.">
+<link rel="canonical" href="https://hobka.mhmymona.workers.dev/ar/">
+<meta property="og:title" content="التقط صورة مع حبّوك | حبكة">
+<meta property="og:description" content="حبّوك يخرج من قصتك ويقف بجانبك أمام الكاميرا.">
+<meta property="og:image" content="https://hobka.mhmymona.workers.dev/images/habbouk.webp">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<link rel="preload" as="image" href="/images/habbouk.webp">
+<link rel="preload" href="/fonts/BalooBhaijaan2-ExtraBold.woff2" as="font" type="font/woff2" crossorigin>
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/jsm/" } }
+</script>
+</head>
+<body>
+  <video id="cam" playsinline muted autoplay></video>
+  <canvas id="stage"></canvas>
+  <div id="flash"></div>
+
+  <!-- start -->
+  <section id="intro" class="screen show">
+    <div class="glow" aria-hidden="true"></div>
+    <div class="card">
+      <a class="logo" href="/" aria-label="حبكة، الرئيسية"><img src="/brand/logo-brand.svg" alt="hobka" width="120" height="40"></a>
+      <div class="hello">
+        <p id="bubble" class="bubble">مرحباً! أنا حبّوك، أرتّب تاجي وأجيء إليك…</p>
+        <img src="/images/habbouk.webp" alt="حبّوك يقف مبتسماً" width="520" height="607">
+      </div>
+      <h1>حبّوك خرج من قصتك!</h1>
+      <p class="lead">افتح الكاميرا، استمع لحبّوك، ثم التقط صورة معه.</p>
+      <button id="startBtn" class="btn primary" disabled>
+        <span id="startLabel">جارٍ تحضير حبّوك…</span>
+      </button>
+      <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+      <p id="pct" class="pct">٠٪</p>
+      <p class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>الصورة تُصنع على هاتفك فقط، ولا تُرفع إلى أي مكان.</p>
+      <p id="inapp" class="warn hidden">إذا لم تعمل الكاميرا، افتح هذه الصفحة في Safari أو Chrome.</p>
+      <a class="back" href="/">العودة إلى حبكة</a>
+    </div>
+  </section>
+
+  <!-- error -->
+  <section id="errorBox" class="screen">
+    <div class="card">
+      <a class="logo" href="/" aria-label="حبكة"><img src="/brand/logo-brand.svg" alt="hobka" width="120" height="40"></a>
+      <h1>نحتاج الكاميرا</h1>
+      <p id="errorText">اسمح للصفحة باستخدام الكاميرا لتلتقط صورة مع حبّوك، ثم أعد المحاولة.</p>
+      <button id="retryBtn" class="btn primary">أعد المحاولة</button>
+    </div>
+  </section>
+
+  <!-- live controls -->
+  <div id="hud" class="hidden">
+    <button id="skipBtn" class="pill">تخطَّ التحية ←</button>
+    <div id="poses" class="hidden">
+      <button class="pose active" data-pose="wave"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5v-1a1.5 1.5 0 0 1 3 0V11m0-5a1.5 1.5 0 0 1 3 0v6m0-3.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a7 7 0 0 1-6-3.4L3.5 14a1.6 1.6 0 0 1 2.7-1.6L7 13.5"/></svg><span>يلوّح</span></button>
+      <button class="pose" data-pose="heart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z"/></svg><span>على قلبي</span></button>
+      <button class="pose" data-pose="clap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M5.6 5.6l2 2M18.4 5.6l-2 2"/><path d="M8 21l-2.5-5.5a1.5 1.5 0 0 1 2.6-1.4L9 15.5V10a1.5 1.5 0 0 1 3 0v4.5-6a1.5 1.5 0 0 1 3 0V14m0-4a1.5 1.5 0 0 1 3 0v5a6 6 0 0 1-6 6Z"/></svg><span>يصفّق</span></button>
+      <button class="pose" data-pose="proud"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg><span>بفخر</span></button>
+    </div>
+    <div class="bottom">
+      <button id="flipBtn" class="round" aria-label="بدّل الكاميرا"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10.5a5.5 5.5 0 0 1 0 11H9"/><path d="m7 5-3 3 3 3"/><path d="M20 16H9.5a5.5 5.5 0 0 1 0-11H15"/><path d="m17 19 3-3-3-3"/></svg></button>
+      <button id="shotBtn" class="shutter" aria-label="التقط صورة" disabled></button>
+      <button id="replayBtn" class="round" aria-label="أعد التحية"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    </div>
+    <p id="hint" class="hint">اسحب حبّوك لتحرّكه، وكبّره بإصبعين</p>
+  </div>
+  <div id="count"></div>
+
+  <!-- result -->
+  <section id="result" class="screen">
+    <div class="card wide">
+      <img id="photo" alt="صورتك مع حبّوك">
+      <div class="row">
+        <button id="shareBtn" class="btn primary">شارك الصورة</button>
+        <a id="saveBtn" class="btn" download="hobka-habbouk.jpg">احفظ</a>
+      </div>
+      <button id="againBtn" class="btn ghost">صورة جديدة</button>
+      <a class="cta-order" href="/order">اطلب قصة بطلها طفلك ←</a>
+    </div>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

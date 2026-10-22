@@ -4,7 +4,9 @@ import Logo from '../../../components/Logo.astro';
 import Icon from '../../../components/Icon.astro';
 import { db, type OrderRow } from '../../../lib/db';
 import { statuses, type Status } from '../../../lib/order';
-import { boxes, contact } from '../../../config/catalog';
+import { contact } from '../../../config/catalog';
+import { loadCatalog } from '../../../lib/catalog';
+import { orderLines } from '../../../lib/orderLines';
 import { money } from '../../../lib/pricing';
 
 export const prerender = false;
@@ -17,7 +19,8 @@ if (!order) return new Response('Not found', { status: 404 });
 const lang = order.site_lang === 'en' ? 'en' : 'ar';
 const ar = lang === 'ar';
 const child = order.child ? (JSON.parse(order.child) as { name: string }) : null;
-const box = boxes.find((b) => b.id === order.box);
+const boxLine = orderLines(order, await loadCatalog({ includeDeleted: true })).find((l) => l.kind === 'box');
+const box = boxLine ? { name: { ar: boxLine.name_ar, en: boxLine.name_en } } : null;
 const st = order.status as Status;
 // Latest uploaded set of draft page images (a draft update with only a link keeps the previous images).
 const imgEvent = await d.prepare("SELECT note FROM order_events WHERE order_id = ? AND type = 'draft_images' ORDER BY id DESC LIMIT 1").bind(order.id).first<{ note: string }>();

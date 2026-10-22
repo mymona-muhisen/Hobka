@@ -73,6 +73,15 @@ const SCHEMA = [
     note TEXT,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS products (
+    id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('item','box')),
+    data TEXT NOT NULL,
+    sort INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (kind, id)
+  )`,
   `CREATE TABLE IF NOT EXISTS rate_limits (
     key TEXT PRIMARY KEY,
     count INTEGER NOT NULL,
@@ -80,10 +89,26 @@ const SCHEMA = [
   )`,
 ];
 
+/* Columns added after the first release; added in place on existing databases. */
+const ORDER_COLUMNS: [string, string][] = [
+  ['lines', 'TEXT'],
+  ['cost_total', 'REAL NOT NULL DEFAULT 0'],
+  ['extra_cost', 'REAL NOT NULL DEFAULT 0'],
+];
+
+async function migrate() {
+  await env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q)));
+  const { results } = await env.DB.prepare('PRAGMA table_info(orders)').all<{ name: string }>();
+  const have = new Set(results.map((r) => r.name));
+  for (const [col, type] of ORDER_COLUMNS) {
+    if (!have.has(col)) await env.DB.prepare(`ALTER TABLE orders ADD COLUMN ${col} ${type}`).run();
+  }
+}
+
 let ready: Promise<void> | null = null;
 export function db(): Promise<D1> {
   if (!ready) {
-    ready = env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q))).then(() => undefined);
+    ready = migrate();
     ready.catch(() => (ready = null));
   }
   return ready.then(() => env.DB);
@@ -117,4 +142,5 @@ export interface OrderRow {
   parent_name: string; phone: string; governorate: string; address: string; notes: string | null;
   discount_code: string | null; subtotal: number; shipping: number; discount: number; total: number;
   draft_url: string | null; draft_message: string | null; draft_version: number; feedback: string | null; approved_at: string | null; admin_notes: string | null;
+  lines: string | null; cost_total: number; extra_cost: number;
 }

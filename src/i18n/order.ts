@@ -1,7 +1,7 @@
 export const orderUi = {
   ar: {
     title: 'اطلب قصة لطفلك',
-    metaTitle: 'اطلب قصة | حبكة',
+    metaTitle: 'اطلب قصة مخصّصة باسم طفلك | حبكة',
     metaDesc: 'خطوات قصيرة لطلب قصة مخصّصة لطفلك من حبكة. ترى شكل طفلك في الرسم أولاً، والدفع بعد موافقتك.',
     intro: 'خطوات قصيرة، ولا دفع الآن: نرسل لك شكل طفلك في الرسم أولاً لتوافق عليه.',
     steps: ['الطلب', 'طفلك', 'الحكاية', 'الصورة', 'الإضافات', 'التوصيل', 'المراجعة'],
@@ -125,7 +125,7 @@ export const orderUi = {
   },
   en: {
     title: 'Order a story for your child',
-    metaTitle: 'Order a story | Hobka',
+    metaTitle: 'Order a personalized story for your child | Hobka',
     metaDesc: 'A few short steps to order a personalized story from Hobka. See your child’s drawn look first, pay after you approve.',
     intro: 'A few short steps and nothing to pay now: we first send you your child’s drawn look to approve.',
     steps: ['Order', 'Your child', 'The story', 'Photo', 'Add-ons', 'Delivery', 'Review'],

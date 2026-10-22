@@ -1,25 +1,29 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { loadCatalog } from '../../lib/catalog';
 import Icon from '../../components/Icon.astro';
-import { contact, items, type Lang } from '../../config/catalog';
+import { contact, type Lang } from '../../config/catalog';
+import { activeItems } from '../../lib/pricing';
 import { path } from '../../i18n/ui';
-export function getStaticPaths() { return [{ params: { lang: undefined } }, { params: { lang: 'en' } }]; }
+export const prerender = false;
+if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const catalog = await loadCatalog();
 const ar = lang === 'ar';
 const T = ar
   ? {
-      title: 'حبّوك | حبكة', h1: 'هذا حبّوك', lead: 'صديق طفلك الذي خرج من صفحات حبكة: فضولي ودافئ ومرح، يحب المغامرات الصغيرة، ويشبه أخاً كبيراً لطيفاً أكثر من أي بطل خارق.',
+      title: 'حبّوك، صديق طفلك في قصص حبكة | التقط صورة معه', h1: 'هذا حبّوك', lead: 'صديق طفلك الذي خرج من صفحات حبكة: فضولي ودافئ ومرح، يحب المغامرات الصغيرة، ويشبه أخاً كبيراً لطيفاً أكثر من أي بطل خارق.',
       where: 'أين يرافق حبّوك طفلك؟', ar: 'التقط صورة مع حبّوك', arText: 'افتح الكاميرا على هاتفك، استمع لتحية حبّوك، اختر حركته المفضلة، ثم التقط صورة معه وشاركها. لا تحتاج تطبيقاً، والصورة تُصنع على هاتفك فقط.',
       arCta: 'افتح الكاميرا مع حبّوك', steps: ['افتح الرابط على هاتفك', 'اسمح باستخدام الكاميرا', 'اختر حركة حبّوك والتقط الصورة'], order: 'اطلب قصة لطفلك',
       alt: 'حبّوك يلوّح بيده',
     }
   : {
-      title: 'Habbouk | Hobka', h1: 'This is Habbouk', lead: 'Your child’s friend who stepped out of Hobka’s pages: curious, warm and playful, loves small adventures, and feels more like a kind big brother than a superhero.',
+      title: 'Habbouk, your child’s friend from Hobka stories', h1: 'This is Habbouk', lead: 'Your child’s friend who stepped out of Hobka’s pages: curious, warm and playful, loves small adventures, and feels more like a kind big brother than a superhero.',
       where: 'Where does Habbouk join your child?', ar: 'Take a photo with Habbouk', arText: 'Open the camera on your phone, hear Habbouk’s greeting, pick his favorite move, then take a photo with him and share it. No app needed, and the photo is made on your phone only.',
       arCta: 'Open the camera with Habbouk', steps: ['Open the link on your phone', 'Allow the camera', 'Pick Habbouk’s move and take the photo'], order: 'Order a story',
       alt: 'Habbouk waving',
     };
-const with_ = [items.letter, items.stickers, items.cards, items.planting, items.figure3d, items.newspaper];
+const with_ = activeItems(catalog).filter((i) => i.id !== 'story');
 ---
 <Base lang={lang} title={T.title} description={T.lead} altPath={ar ? '/en/habbouk' : '/habbouk'}>
   <section class="hb container">
@@ -48,7 +52,7 @@ const with_ = [items.letter, items.stickers, items.cards, items.planting, items.
         <p>{T.arText}</p>
         <ol>{T.steps.map((s) => <li>{s}</li>)}</ol>
         <div class="actions">
-          <a class="btn btn-primary" href={contact.arUrl} target="_blank" rel="noopener"><Icon name="camera" />{T.arCta}</a>
+          <a class="btn btn-primary" href={contact.arUrl}><Icon name="camera" />{T.arCta}</a>
           <a class="btn btn-secondary" href={path(lang, '/order')}>{T.order}</a>
         </div>
       </div>

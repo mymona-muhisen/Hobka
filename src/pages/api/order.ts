@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { orderSchema, newCode, newToken, customerWhatsappText, waLink } from '../../lib/order';
 import { computePrice } from '../../lib/pricing';
+import { loadCatalog } from '../../lib/catalog';
 import { findDiscount } from '../../lib/discount';
 import { db, env, now, logEvent, rateLimit } from '../../lib/db';
 import { clientKey } from '../../lib/auth';
@@ -42,7 +43,19 @@ export const POST: APIRoute = async ({ request }) => {
   const discount = o.discountCode ? await findDiscount(o.discountCode) : null;
   if (o.discountCode && !discount) return fail(422, 'discount_invalid');
 
-  const price = computePrice({ kind: o.kind, box: (o.box ?? null) as never, addons: o.addons, governorate: o.parent.governorate }, discount);
+  const cat = await loadCatalog();
+  let price;
+  try {
+    price = computePrice(cat, { kind: o.kind, box: o.box ?? null, addons: o.addons, governorate: o.parent.governorate }, discount);
+  } catch {
+    return fail(422, 'invalid', [{ path: 'box', message: 'unknown box' }]);
+  }
+  // Snapshot of what was sold, at today's prices and costs (later catalog edits don't change old orders).
+  const lines = price.lines.map((l) => {
+    const [kind, id] = l.id.split(':');
+    const p = kind === 'box' ? cat.boxes.find((b) => b.id === id)! : cat.items[id];
+    return { id, kind, name_ar: p.name.ar, name_en: p.name.en, price: l.amount, cost: l.cost };
+  });
   const code = newCode();
   const token = newToken();
   const t = now();
@@ -52,14 +65,14 @@ export const POST: APIRoute = async ({ request }) => {
   const res = await d
     .prepare(
       `INSERT INTO orders (code, token, created_at, updated_at, status, site_lang, kind, box, addons, child, photo_mode, photo_count, photo_consent,
-        parent_name, phone, governorate, address, notes, discount_code, subtotal, shipping, discount, total)
-       VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        parent_name, phone, governorate, address, notes, discount_code, subtotal, shipping, discount, total, lines, cost_total)
+       VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       code, token, t, t, o.siteLang, o.kind, isBox ? o.box : null, JSON.stringify(price.lines.filter((l) => l.id.startsWith('addon:')).map((l) => l.id.slice(6))),
       child ? JSON.stringify(child) : null, isBox ? o.photoMode : 'none', photos.length, o.photoConsent ? 1 : 0,
       o.parent.name, o.parent.phone, o.parent.governorate, o.parent.address, o.parent.notes || null, discount?.code ?? null,
-      price.subtotal, price.shipping, price.discount, price.total,
+      price.subtotal, price.shipping, price.discount, price.total, JSON.stringify(lines), price.cost,
     )
     .run();
   const orderId = Number(res.meta?.last_row_id ?? 0);
@@ -70,5 +83,5 @@ export const POST: APIRoute = async ({ request }) => {
   if (orderId) await logEvent(orderId, 'customer', 'created', null);
 
   const whatsapp = waLink(contact.whatsapp, customerWhatsappText(o.siteLang, code, o.parent.name, isBox && o.photoMode === 'whatsapp'));
-  return Response.json({ ok: true, code, price, whatsapp });
+  return Response.json({ ok: true, code, total: price.total, whatsapp });
 };

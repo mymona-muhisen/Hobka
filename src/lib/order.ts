@@ -44,6 +44,7 @@ export const orderSchema = z
       if (!o.child) ctx.addIssue({ code: 'custom', path: ['child'], message: 'child required' });
       else if (o.child.values.length === 0 && !o.child.ownIdea) ctx.addIssue({ code: 'custom', path: ['child', 'values'], message: 'value or idea required' });
       if (o.photoMode === 'upload' && !o.photoConsent) ctx.addIssue({ code: 'custom', path: ['photoConsent'], message: 'consent required' });
+      if (o.photoMode === 'none' && (o.child?.appearance ?? '').length < 15) ctx.addIssue({ code: 'custom', path: ['child', 'appearance'], message: 'appearance required without photo' });
     } else if (o.addons.length === 0) {
       ctx.addIssue({ code: 'custom', path: ['addons'], message: 'pick at least one product' });
     }
@@ -64,10 +65,10 @@ export function newToken() {
 
 export const statuses = {
   new: { ar: 'طلب جديد', en: 'New order' },
-  drafting: { ar: 'نجهّز المسودة', en: 'Preparing the draft' },
-  draft_sent: { ar: 'المسودة جاهزة للمراجعة', en: 'Draft ready for review' },
-  changes_requested: { ar: 'طُلب تعديل', en: 'Changes requested' },
-  approved: { ar: 'معتمدة، بانتظار الدفع', en: 'Approved, awaiting payment' },
+  drafting: { ar: 'نرسم شخصية الطفل', en: 'Drawing the character' },
+  draft_sent: { ar: 'شكل الطفل جاهز للموافقة', en: 'Character ready for approval' },
+  changes_requested: { ar: 'طُلب تعديل على الشكل', en: 'Look changes requested' },
+  approved: { ar: 'تمت الموافقة، بانتظار الدفع', en: 'Approved, awaiting payment' },
   paid: { ar: 'تم الدفع', en: 'Paid' },
   printing: { ar: 'قيد الطباعة', en: 'Printing' },
   shipped: { ar: 'تم الشحن', en: 'Shipped' },

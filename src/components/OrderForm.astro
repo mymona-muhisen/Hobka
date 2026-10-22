@@ -27,6 +27,10 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     <form id="order-form" novalidate>
       <ol class="progress" aria-hidden="true"></ol>
       <p class="step-count" id="step-count" aria-live="polite"></p>
+      <div class="guide" aria-hidden="true">
+        <img src="/images/habbouk-face.webp" width="177" height="200" alt="" />
+        <p id="guide-text"></p>
+      </div>
       <div class="form-error" id="form-error" role="alert" hidden></div>
 
       <!-- 1. What -->
@@ -89,10 +93,6 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
           </div>
         </fieldset>
         <div class="field">
-          <label for="c-look">{t.appearance} <span class="muted">{t.optional}</span></label>
-          <textarea id="c-look" name="appearance" rows="2" maxlength="400" placeholder={t.appearanceHint}></textarea>
-        </div>
-        <div class="field">
           <label for="c-likes">{t.interests} <span class="muted">{t.optional}</span></label>
           <input id="c-likes" name="interests" type="text" maxlength="300" placeholder={t.interestsHint} />
         </div>
@@ -102,26 +102,50 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       <section class="step" data-step="story" hidden>
         <h2>{t.storyTitle}</h2>
         <fieldset class="field">
-          <legend>{t.valuesLabel} <span class="muted small">{fill(t.valuesHint, { max: maxValues })}</span></legend>
-          <div class="chips">
-            {storyValues.map((v) => (
-              <label class="chip" title={v.desc[lang]}>
-                <input type="checkbox" name="values" value={v.id} />
-                <span><span aria-hidden="true">{v.emoji}</span> {v.name[lang]}</span>
-              </label>
-            ))}
+          <legend>{t.storyHow}</legend>
+          <div class="choice-grid mode-grid" role="radiogroup">
+            <label class="choice mode">
+              <input type="radio" name="storyMode" value="ready" />
+              <span class="choice-body"><span class="mode-icon"><Icon name="list" /></span><strong>{t.modeReady}</strong><span class="muted small">{t.modeReadyDesc}</span></span>
+            </label>
+            <label class="choice mode">
+              <input type="radio" name="storyMode" value="own" />
+              <span class="choice-body"><span class="mode-icon"><Icon name="pencil" /></span><strong>{t.modeOwn}</strong><span class="muted small">{t.modeOwnDesc}</span></span>
+            </label>
           </div>
+          <p class="field-error" data-error="storyMode" hidden></p>
         </fieldset>
-        <div class="field">
-          <label for="s-note">{t.valueNote} <span class="muted">{t.optional}</span></label>
-          <input id="s-note" name="valueNote" type="text" maxlength="400" placeholder={t.valueNoteHint} />
+
+        <div class="panel" id="panel-ready" hidden>
+          <fieldset class="field">
+            <legend>{t.valuesLabel} <span class="count" id="values-count" aria-live="polite">{fill(t.valuesCount, { n: 0, max: maxValues })}</span></legend>
+            <div class="values">
+              {storyValues.map((v) => (
+                <label class="value">
+                  <input type="checkbox" name="values" value={v.id} />
+                  <span class="value-body">
+                    <span class="v-icon"><Icon name={v.icon} /></span>
+                    <span class="v-text"><strong>{v.name[lang]}</strong><span class="muted small">{v.desc[lang]}</span></span>
+                    <span class="v-check" aria-hidden="true"><Icon name="check" /></span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p class="field-error" data-error="values" hidden></p>
+          </fieldset>
+          <div class="field">
+            <label for="s-note">{t.valueNote} <span class="muted">{t.optional}</span></label>
+            <input id="s-note" name="valueNote" type="text" maxlength="400" placeholder={t.valueNoteHint} />
+          </div>
         </div>
-        <p class="or"><span>{t.or}</span></p>
-        <div class="field">
-          <label for="s-idea">{t.ownIdea}</label>
-          <textarea id="s-idea" name="ownIdea" rows="3" maxlength="800" placeholder={t.ownIdeaHint}></textarea>
+
+        <div class="panel" id="panel-own" hidden>
+          <div class="field">
+            <label for="s-idea">{t.ownIdea}</label>
+            <textarea id="s-idea" name="ownIdea" rows="4" maxlength="800" placeholder={t.ownIdeaHint}></textarea>
+            <p class="field-error" data-error="ownIdea" hidden></p>
+          </div>
         </div>
-        <p class="field-error" data-error="values" hidden></p>
         {stylesEnabled && (
           <fieldset class="field">
             <legend>{t.styleLabel}</legend>
@@ -156,6 +180,11 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
             <span>{fill(t.photoConsent, { days })}</span>
           </label>
           <p class="field-error" data-error="photoConsent" hidden></p>
+        </div>
+        <div class="field look">
+          <label for="c-look">{t.appearance} <span class="muted" id="look-flag" data-opt={t.optional} data-req={t.appearanceRequired}>{t.optional}</span></label>
+          <textarea id="c-look" name="appearance" rows="3" maxlength="400" placeholder={t.appearanceHint}></textarea>
+          <p class="field-error" data-error="appearance" hidden></p>
         </div>
       </section>
 
@@ -199,6 +228,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
             <option value="">{t.choose}</option>
             {governorates.map((g) => <option value={g.id}>{g.name[lang]} (+{money(g.shipping, lang)})</option>)}
           </select>
+          <p class="hint">{t.shipNote}</p>
           <p class="field-error" data-error="governorate" hidden></p>
         </div>
         <div class="field">
@@ -249,6 +279,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
         <div id="sum-disc-row" hidden><dt>{t.discountLine}</dt><dd id="sum-disc"></dd></div>
         <div class="total"><dt>{t.total}</dt><dd id="sum-total">—</dd></div>
       </dl>
+      <p class="muted small">{t.shipNote}</p>
       {!pricesAreFinal && <p class="muted small">{t.priceNote}</p>}
       <p class="muted small">{t.noPayNow}</p>
     </aside>
@@ -323,10 +354,16 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       if (!radio('gender')) errs.push(['gender', req]);
       if (!val('age')) errs.push(['age', req]);
     }
-    if (name === 'story' && checked('values').length === 0 && !val('ownIdea')) errs.push(['values', str('needValue')]);
+    if (name === 'story') {
+      const sm = radio('storyMode');
+      if (!sm) errs.push(['storyMode', str('needMode')]);
+      if (sm === 'ready' && checked('values').length === 0) errs.push(['values', str('needValue')]);
+      if (sm === 'own' && val('ownIdea').length < 10) errs.push(['ownIdea', str('needIdea')]);
+    }
     if (name === 'photo') {
       const mode = radio('photoMode');
       if (!mode) errs.push(['photoMode', req]);
+      if (mode === 'none' && val('appearance').length < 15) errs.push(['appearance', str('appearanceNeed')]);
       if (mode === 'upload') {
         if (!photos.length) errs.push(['photos', str('photoNeed')]);
         if (!($('#p-consent') as HTMLInputElement).checked) errs.push(['photoConsent', str('consentNeed')]);
@@ -357,6 +394,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     $('#step-count').textContent = str('stepOf', { n: current + 1, total: f.length }) + ' · ' + S.steps[['kind', 'child', 'story', 'photo', 'addons', 'delivery', 'review'].indexOf(name)];
     const prog = form.querySelector('.progress')!;
     prog.innerHTML = f.map((_, i) => `<li class="${i < current ? 'done' : i === current ? 'cur' : ''}"></li>`).join('');
+    $('#guide-text').textContent = (S.guide as unknown as Record<string, string>)[name] ?? '';
     ($('#back') as HTMLButtonElement).style.visibility = current === 0 ? 'hidden' : 'visible';
     $('#next').hidden = name === 'review';
     $('#submit').hidden = name !== 'review';
@@ -387,7 +425,8 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     const box = el.closest('.field, fieldset, .upload, .step');
     const errs = el.closest('.upload') ? [...box!.querySelectorAll<HTMLElement>('[data-error]')].filter((x) => x.dataset.error === (el.id === 'p-consent' ? 'photoConsent' : 'photos'))
       : [...(box?.querySelectorAll<HTMLElement>(':scope > [data-error], :scope > .field-error') ?? [])];
-    if (el.getAttribute('name') === 'values' || el.id === 's-idea') errs.push(form.querySelector('[data-error="values"]')!);
+    if (el.getAttribute('name') === 'values') errs.push(form.querySelector('[data-error="values"]')!);
+    if (el.getAttribute('name') === 'storyMode') errs.push(form.querySelector('[data-error="storyMode"]')!);
     if (el.getAttribute('name') === 'photoMode') errs.push(form.querySelector('[data-error="photoMode"]')!);
     if (el.getAttribute('name') === 'box') errs.push(form.querySelector('[data-error="box"]')!);
     if (el.id === 'privacy') errs.push(form.querySelector('[data-error="privacy"]')!);
@@ -402,8 +441,28 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       const all = form.querySelectorAll<HTMLInputElement>('input[name="values"]');
       const n = checked('values').length;
       all.forEach((x) => (x.disabled = !x.checked && n >= maxValues));
+      $('#values-count').textContent = str('valuesCount', { n, max: maxValues });
     }),
   );
+
+  // ───────── story mode: ready value(s) or own idea
+  form.querySelectorAll('input[name="storyMode"]').forEach((r) =>
+    r.addEventListener('change', () => {
+      const m = radio('storyMode');
+      $('#panel-ready').hidden = m !== 'ready';
+      $('#panel-own').hidden = m !== 'own';
+    }),
+  );
+
+  // ───────── appearance is required when no photo is sent
+  function syncLook() {
+    const req = radio('photoMode') === 'none';
+    const flag = $('#look-flag');
+    flag.textContent = (req ? flag.dataset.req : flag.dataset.opt) ?? '';
+    flag.classList.toggle('req', req);
+    ($('#c-look') as HTMLTextAreaElement).required = req;
+  }
+  form.querySelectorAll('input[name="photoMode"]').forEach((r) => r.addEventListener('change', syncLook));
 
   // ───────── add-ons depend on the box
   function prepareAddons() {
@@ -504,9 +563,12 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     rows.push([str('box'), b === 'only' ? str('kindOnly') : boxes.find((x) => x.id === b)!.name[L], 'kind']);
     if (!isOnly()) {
       rows.push([str('child'), `${val('childName')} · ${radio('gender') === 'girl' ? str('girl') : str('boy')} · ${val('age')} ${str('years')}`, 'child']);
-      const vs = checked('values').map((id) => storyValues.find((v) => v.id === id)!.name[L]).join('، ');
-      if (vs) rows.push([str('values'), vs + (val('valueNote') ? ` (${val('valueNote')})` : ''), 'story']);
-      if (val('ownIdea')) rows.push([str('idea'), val('ownIdea'), 'story']);
+      if (radio('storyMode') === 'ready') {
+        const vs = checked('values').map((id) => storyValues.find((v) => v.id === id)!.name[L]).join('، ');
+        rows.push([str('values'), vs + (val('valueNote') ? ` (${val('valueNote')})` : ''), 'story']);
+      } else {
+        rows.push([str('idea'), val('ownIdea'), 'story']);
+      }
       const pm = radio('photoMode');
       rows.push([str('photo'), pm === 'upload' ? `${str('photoUpload')} (${photos.length})` : pm === 'whatsapp' ? str('photoWhatsapp') : str('photoNone'), 'photo']);
     }
@@ -539,7 +601,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       addons: checked('addons'),
       child: b === 'only' ? null : {
         name: val('childName'), gender: radio('gender'), age: Number(val('age')), storyLang: radio('storyLang') || L,
-        values: checked('values'), valueNote: val('valueNote'), ownIdea: val('ownIdea'),
+        ...(radio('storyMode') === 'ready' ? { values: checked('values'), valueNote: val('valueNote'), ownIdea: '' } : { values: [], valueNote: '', ownIdea: val('ownIdea') }),
         appearance: val('appearance'), interests: val('interests'), ...(radio('style') ? { style: radio('style') } : {}),
       },
       photoMode: b === 'only' ? 'none' : radio('photoMode'),
@@ -690,12 +752,48 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   .code { font-family: var(--font-display); font-size: 2rem; font-weight: 800; color: var(--color-brand-dark); letter-spacing: 0.05em; }
   .result-card .btn { margin-top: var(--space-2); }
 
+
+  /* Habbouk guide */
+  .guide { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-3)) 0 var(--space-6); }
+  .guide img { width: 52px; height: auto; flex: none; filter: drop-shadow(0 4px 6px rgb(78 13 28 / 18%)); }
+  .guide p { margin: 0; position: relative; background: var(--color-rose-soft); color: var(--color-brand-dark); font-weight: 500; border-radius: 16px; padding: var(--space-2) var(--space-4); font-size: 0.97rem; }
+  .guide p::before { content: ''; position: absolute; inset-inline-start: -6px; top: 50%; width: 12px; height: 12px; background: var(--color-rose-soft); transform: translateY(-50%) rotate(45deg); }
+
+  /* story mode cards */
+  .mode .choice-body { padding-block: var(--space-4); gap: var(--space-2); }
+  .mode-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--color-rose-soft); color: var(--color-brand); }
+  .mode-icon :global(svg) { width: 22px; height: 22px; }
+  .mode input:checked + .choice-body .mode-icon { background: var(--color-brand); color: #fff; }
+  .panel { border-top: 1px dashed var(--color-border); padding-top: var(--space-6); }
+  .count { display: inline-block; margin-inline-start: var(--space-2); font-size: 0.85rem; font-weight: 700; color: var(--color-brand); background: var(--color-rose-soft); border-radius: 999px; padding: 0.05rem 0.6rem; }
+
+  /* value tiles */
+  .values { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); }
+  .value { margin: 0; font-weight: 400; cursor: pointer; position: relative; }
+  .value input { position: absolute; opacity: 0; }
+  .value-body { display: flex; align-items: flex-start; gap: var(--space-3); height: 100%; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); background: var(--color-paper); transition: border-color .15s, background .15s; }
+  .v-icon { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--color-white); color: var(--color-brand); border: 1px solid var(--color-border); }
+  .v-icon :global(svg) { width: 20px; height: 20px; }
+  .v-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.45; min-width: 0; }
+  .v-text strong { font-size: 0.98rem; color: var(--color-ink); }
+  .v-check { margin-inline-start: auto; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #c9b3b9; display: grid; place-items: center; color: transparent; background: #fff; }
+  .v-check :global(svg) { width: 14px; height: 14px; stroke-width: 3; }
+  .value input:checked + .value-body { border-color: var(--color-brand); background: var(--color-rose-soft); }
+  .value input:checked + .value-body .v-icon { background: var(--color-brand); color: #fff; border-color: var(--color-brand); }
+  .value input:checked + .value-body .v-check { background: var(--color-brand); border-color: var(--color-brand); color: #fff; }
+  .value input:disabled + .value-body { opacity: 0.45; cursor: not-allowed; }
+  .value input:focus-visible + .value-body { outline: 3px solid var(--color-apricot); outline-offset: 2px; }
+
+  .look { margin-top: var(--space-6); }
+  :global(#look-flag.req) { color: var(--color-brand); font-weight: 700; }
+
   @media (max-width: 960px) {
     .layout { grid-template-columns: 1fr; }
     .summary { position: static; order: 2; }
   }
   @media (max-width: 600px) {
     .choice-grid, .row { grid-template-columns: 1fr; }
+    .values { grid-template-columns: 1fr; }
     .review :global(div) { grid-template-columns: 1fr auto; }
     .review :global(dt) { grid-column: 1 / -1; }
     .nav .btn { flex: 1; min-width: 0; }

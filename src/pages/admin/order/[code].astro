@@ -32,14 +32,21 @@ if (Astro.request.method === 'POST') {
       if (!(s in statuses)) throw new Error('حالة غير معروفة');
       await d.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?').bind(s, t, o.id).run();
       await logEvent(o.id, 'admin', 'status', s);
+    } else if (action === 'shipping') {
+      const v = Number(String(form.get('shipping') ?? '').replace(',', '.'));
+      if (!Number.isFinite(v) || v < 0 || v > 500) throw new Error('كلفة الشحن غير صحيحة.');
+      const ship = Math.round(v * 100) / 100;
+      const total = Math.round((o.subtotal - o.discount + ship) * 100) / 100;
+      await d.prepare('UPDATE orders SET shipping = ?, total = ?, updated_at = ? WHERE id = ?').bind(ship, total, t, o.id).run();
+      await logEvent(o.id, 'admin', 'shipping', `${o.shipping} ← ${ship}`);
     } else if (action === 'notes') {
       await d.prepare('UPDATE orders SET admin_notes = ?, updated_at = ? WHERE id = ?').bind(String(form.get('admin_notes') ?? '').slice(0, 4000), t, o.id).run();
     } else if (action === 'draft') {
       const url = String(form.get('draft_url') ?? '').trim();
-      if (url && !/^https:\/\//.test(url)) throw new Error('رابط المسودة يجب أن يبدأ بـ https://');
+      if (url && !/^https:\/\//.test(url)) throw new Error('الرابط يجب أن يبدأ بـ https://');
       const msg = String(form.get('draft_message') ?? '').trim().slice(0, 2000);
       const files = form.getAll('pages').filter((f): f is File => typeof f === 'object' && f !== null && 'arrayBuffer' in f && (f as File).size > 0);
-      if (!url && !files.length) throw new Error('أضيفي رابط المسودة أو صور الصفحات.');
+      if (!url && !files.length) throw new Error('أضيفي رسومات الشخصية أو رابطاً.');
       if (files.length > 60) throw new Error('الحد الأقصى 60 صفحة.');
       const version = o.draft_version + 1;
       for (let i = 0; i < files.length; i++) {
@@ -80,18 +87,18 @@ const photosExpire = new Date(created + photoRetentionDays * 86400000);
 
 const msgs = lang === 'en'
   ? {
-      confirm: `Hello ${o.parent_name} 🌸\nWe received your order ${o.code} ✅\nWe're preparing the free draft and will send it within ${timing.draftDays.en}.`,
-      draft: `Hello ${o.parent_name} 🌸\n${child ? `${child.name}'s story draft is ready!` : 'Your draft is ready!'}\nReview it here, then approve it or write your notes:\n${draftLink}`,
-      pay: `Thank you for approving the draft 💛\nOrder ${o.code}\nTotal: ${money(o.total, 'en')}\n${payment.instructions.en}\nWe start printing as soon as payment arrives.`,
+      confirm: `Hello ${o.parent_name} 🌸\nWe received your order ${o.code} ✅\nWe're drawing your child and will send you their look within ${timing.draftDays.en} for your approval.`,
+      draft: `Hello ${o.parent_name} 🌸\n${child ? `This is how ${child.name} will look in their story!` : 'Your child’s drawing is ready!'}\nHave a look and approve the likeness, or write your notes (the story stays a surprise 🎁):\n${draftLink}`,
+      pay: `Thank you for approving the look 💛\nOrder ${o.code}\nTotal: ${money(o.total, 'en')}\n${payment.instructions.en}\nWe start printing as soon as payment arrives.`,
       shipped: `Good news! Order ${o.code} is on its way to you 📦`,
     }
   : {
-      confirm: `مرحباً ${o.parent_name} 🌸\nوصلنا طلبك ${o.code} ✅\nنجهّز المسودة المجانية وسنرسلها لك خلال ${timing.draftDays.ar}.`,
-      draft: `مرحباً ${o.parent_name} 🌸\n${child ? `مسودة قصة ${child.name} جاهزة!` : 'المسودة جاهزة!'}\nراجعها من هنا، ثم اعتمدها أو اكتب ملاحظاتك:\n${draftLink}`,
-      pay: `شكراً لاعتماد المسودة 💛\nالطلب ${o.code}\nالمبلغ: ${money(o.total, 'ar')}\n${payment.instructions.ar}\nنبدأ الطباعة فور وصول الدفعة.`,
+      confirm: `مرحباً ${o.parent_name} 🌸\nوصلنا طلبك ${o.code} ✅\nنرسم شخصية طفلك وسنرسل لك شكله خلال ${timing.draftDays.ar} لتوافق عليه.`,
+      draft: `مرحباً ${o.parent_name} 🌸\n${child ? `هكذا سيظهر ${child.name} في حكايته!` : 'رسمة طفلك جاهزة!'}\nشاهدها من هنا ووافق على الشبه، أو اكتب ملاحظاتك (الحكاية نفسها تبقى مفاجأة 🎁):\n${draftLink}`,
+      pay: `شكراً لموافقتك على شكل طفلك 💛\nالطلب ${o.code}\nالمبلغ: ${money(o.total, 'ar')}\n${payment.instructions.ar}\nنبدأ الطباعة فور وصول الدفعة.`,
       shipped: `خبر جميل! طلبك ${o.code} في الطريق إليك 📦`,
     };
-const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', status: 'تغيير الحالة', draft_sent: 'أُرسلت المسودة', draft_images: 'صفحات المسودة', approved: 'اعتمد العميل المسودة', changes_requested: 'طلب العميل تعديلات', photos_deleted: 'حُذفت الصور' };
+const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', status: 'تغيير الحالة', draft_sent: 'أُرسل شكل الطفل', draft_images: 'رسومات الشخصية', approved: 'وافق الأهل على الشكل', changes_requested: 'طلب الأهل تعديلاً', photos_deleted: 'حُذفت الصور', shipping: 'تعديل كلفة الشحن' };
 ---
 <Admin title={o.code}>
   <p><a href="/admin">→ كل الطلبات</a></p>
@@ -108,7 +115,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
     <div>
       {o.feedback && (
         <section class="apanel fb">
-          <h2>{o.status === 'changes_requested' ? '✏️ ملاحظات العميل على المسودة' : '💬 ملاحظة العميل'}</h2>
+          <h2>{o.status === 'changes_requested' ? '✏️ ملاحظات الأهل على شكل الطفل' : '💬 ملاحظة العميل'}</h2>
           <p class="pre">{o.feedback}</p>
         </section>
       )}
@@ -151,26 +158,26 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
       )}
 
       <section class="apanel">
-        <h2>المسودة</h2>
+        <h2>شكل الطفل في الرسم (للموافقة)</h2>
         {o.draft_version > 0 && <p class="muted">النسخة الحالية: {o.draft_version}</p>}
         <form method="post" enctype="multipart/form-data" id="draft-form">
           <input type="hidden" name="action" value="draft" />
           <div class="afield">
-            <label for="du">رابط المسودة (اختياري، مثل PDF على Google Drive)</label>
+            <label for="du">رابط خارجي (اختياري، مثل صورة على Google Drive)</label>
             <input id="du" name="draft_url" type="url" dir="ltr" value={o.draft_url ?? ''} placeholder="https://" />
           </div>
           <div class="afield">
-            <label for="dp">صور صفحات المسودة (اختياري، تُصغَّر تلقائياً)</label>
+            <label for="dp">رسومات شخصية الطفل (تُصغَّر تلقائياً)</label>
             <input id="dp" name="pages" type="file" accept="image/*" multiple />
           </div>
           <div class="afield">
-            <label for="dm">رسالة تظهر للأهل فوق المسودة (اختياري)</label>
+            <label for="dm">رسالة تظهر للأهل فوق الرسومات (اختياري)</label>
             <textarea id="dm" name="draft_message" rows="2">{o.draft_message ?? ''}</textarea>
           </div>
-          <button class="abtn primary" type="submit">احفظ المسودة واجعل الحالة «جاهزة للمراجعة»</button>
+          <button class="abtn primary" type="submit">احفظ واجعل الحالة «شكل الطفل جاهز للموافقة»</button>
           <p class="muted" id="draft-progress" aria-live="polite"></p>
         </form>
-        <p class="link">رابط صفحة المسودة الخاص: <a href={draftLink} target="_blank" class="ltr">/d/{o.token.slice(0, 8)}…</a></p>
+        <p class="link">رابط صفحة الموافقة الخاص: <a href={draftLink} target="_blank" class="ltr">/d/{o.token.slice(0, 8)}…</a></p>
       </section>
     </div>
 
@@ -179,7 +186,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
         <h2>تواصل سريع على واتساب</h2>
         <div class="wa-list">
           <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.confirm)}><Icon name="chat" />تأكيد استلام الطلب</a>
-          <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.draft)}><Icon name="chat" />إرسال رابط المسودة</a>
+          <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.draft)}><Icon name="chat" />إرسال رابط شكل الطفل</a>
           <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.pay)}><Icon name="chat" />إرسال تفاصيل الدفع</a>
           <a class="abtn wa" target="_blank" rel="noopener" href={waLink(phoneIntl, msgs.shipped)}><Icon name="chat" />تم الشحن</a>
           <a class="abtn" target="_blank" rel="noopener" href={`https://wa.me/${phoneIntl}`}>محادثة فارغة</a>
@@ -206,7 +213,13 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
           {o.discount > 0 && <li><span>خصم <span class="ltr">{o.discount_code}</span></span><span>−{money(o.discount)}</span></li>}
           <li class="total"><span>المجموع</span><span>{money(o.total)}</span></li>
         </ul>
-        <p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب.</p>
+        <p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. الشحن تقريبي: عدّليه حسب سعر الشركة قبل إرسال تفاصيل الدفع.</p>
+        <form method="post" class="row ship">
+          <input type="hidden" name="action" value="shipping" />
+          <label class="sr-only" for="ship">كلفة الشحن الفعلية</label>
+          <input id="ship" name="shipping" type="number" step="0.5" min="0" inputmode="decimal" value={o.shipping} />
+          <button class="abtn" type="submit">تعديل الشحن</button>
+        </form>
       </section>
 
       <section class="apanel">
@@ -282,6 +295,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
   .wa-list { display: grid; gap: 0.5rem; }
   .row { display: flex; gap: 0.5rem; }
   .row select { flex: 1; font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); }
+  .ship input { flex: 1; font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); max-width: 140px; }
   .lines { list-style: none; padding: 0; margin: 0 0 0.5rem; display: grid; gap: 0.3rem; }
   .lines li { display: flex; justify-content: space-between; gap: 1rem; }
   .lines .total { font-weight: 800; border-top: 1px solid var(--color-border); padding-top: 0.4rem; }

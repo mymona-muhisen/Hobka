@@ -2,7 +2,7 @@
 import Icon from './Icon.astro';
 import heart from '../assets/heart.svg?raw';
 import { ui, path, fill } from '../i18n/ui';
-import { boxes, items, storyValues, contact, timing, photoRetentionDays, pricesAreFinal, type Lang } from '../config/catalog';
+import { boxes, items, contact, timing, photoRetentionDays, pricesAreFinal, type Lang } from '../config/catalog';
 import { money } from '../lib/pricing';
 
 interface Props { lang: Lang }
@@ -76,6 +76,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
     {!pricesAreFinal && <p class="price-note muted">{t.boxes.priceNote}</p>}
 
     <div class="standalone">
+      <img src="/images/seedling.webp" width="900" height="411" alt="" loading="lazy" class="st-img" />
       <div>
         <h3>{t.standalone.title}</h3>
         <p class="muted">{t.standalone.sub}</p>
@@ -104,16 +105,15 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   </div>
 </section>
 
-<!-- Values -->
-<section class="section values">
-  <div class="container">
-    <div class="section-head center">
-      <h2>{t.valuesSection.title}</h2>
-      <p>{t.valuesSection.sub}</p>
+<!-- Surprise -->
+<section class="section surprise">
+  <div class="container sp-grid">
+    <img src="/images/surprise.webp" width="1200" height="675" alt={t.surprise.imgAlt} loading="lazy" class="sp-img" />
+    <div>
+      <p class="eyebrow"><Icon name="eye" />{lang === 'ar' ? 'ما الذي نعرضه عليك قبل الطباعة؟' : 'What do we show you before printing?'}</p>
+      <h2>{t.surprise.title}</h2>
+      <p class="lead">{t.surprise.text}</p>
     </div>
-    <ul class="value-chips">
-      {storyValues.map((v) => <li title={v.desc[lang]}><span aria-hidden="true">{v.emoji}</span>{v.name[lang]}</li>)}
-    </ul>
   </div>
 </section>
 
@@ -136,7 +136,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
 <!-- Habbouk -->
 <section class="section habbouk" id="habbouk">
   <div class="container hb-grid">
-    <img src="/images/habbouk.webp" width="282" height="460" alt={t.habbouk.imgAlt} loading="lazy" class="hb-img" />
+    <img src="/images/habbouk.webp" width="520" height="607" alt={t.habbouk.imgAlt} loading="lazy" class="hb-img" />
     <div>
       <h2>{t.habbouk.title}</h2>
       <p class="lead">{t.habbouk.text}</p>
@@ -213,7 +213,8 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   .box li.soon { color: var(--color-muted); }
   .box li .badge { margin-inline-start: var(--space-2); font-size: 0.75rem; }
   .price-note { text-align: center; margin-top: var(--space-4); font-size: 0.95rem; }
-  .standalone { margin-top: var(--space-12); display: grid; grid-template-columns: 1.2fr 1.2fr auto; gap: var(--space-6); align-items: center; background: var(--color-sage); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-8); }
+  .standalone { margin-top: var(--space-12); display: grid; grid-template-columns: 200px 1.2fr 1.2fr auto; gap: var(--space-6); align-items: center; background: var(--color-sage); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-8); }
+  .st-img { width: 200px; height: 120px; object-fit: cover; border-radius: var(--radius-md); }
   .standalone h3 { margin-bottom: var(--space-1); }
   .standalone p { margin: 0; }
   .standalone ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
@@ -225,9 +226,10 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   .num { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--color-brand); color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; margin-bottom: var(--space-4); }
   .step p { color: var(--color-muted); margin: 0; }
 
-  /* Values */
-  .value-chips { list-style: none; margin: 0 auto; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); max-width: 960px; }
-  .value-chips li { display: inline-flex; align-items: center; gap: var(--space-2); background: var(--color-white); border: 1px solid var(--color-border); border-radius: 999px; padding: var(--space-2) var(--space-4); font-weight: 500; }
+  /* Surprise */
+  .sp-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(2rem, 5vw, 4rem); align-items: center; }
+  .sp-img { width: 100%; border-radius: var(--radius-xl); box-shadow: var(--shadow-lift); aspect-ratio: 16 / 10; object-fit: cover; }
+  .surprise .eyebrow :global(svg) { width: 20px; height: 20px; }
 
   /* Gallery */
   .gallery { background: var(--color-rose-soft); }
@@ -240,7 +242,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
 
   /* Habbouk */
   .hb-grid { display: grid; grid-template-columns: auto 1fr; gap: clamp(2rem, 6vw, 5rem); align-items: center; max-width: 980px; }
-  .hb-img { width: clamp(150px, 22vw, 240px); filter: drop-shadow(0 16px 20px rgb(78 13 28 / 20%)); animation: bob 3s ease-in-out infinite; }
+  .hb-img { width: clamp(180px, 26vw, 300px); filter: drop-shadow(0 16px 20px rgb(78 13 28 / 20%)); animation: bob 3s ease-in-out infinite; }
   @keyframes bob { 50% { transform: translateY(-10px); } }
 
   /* FAQ */
@@ -276,6 +278,8 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
     .g1 { grid-row: auto; grid-column: span 2; aspect-ratio: 1; }
     .g4 { grid-column: span 2; aspect-ratio: 16 / 9; }
     .hb-grid { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+    .sp-grid { grid-template-columns: 1fr; }
+    .st-img { width: 100%; height: 140px; }
     .hb-grid .actions { justify-content: center; }
     .tagline { min-height: 0; }
   }

@@ -42,6 +42,7 @@ export const pricesAreFinal = false;
 export type ItemId =
   | 'story'
   | 'stickers'
+  | 'letter'
   | 'cards'
   | 'planting'
   | 'puzzle'
@@ -81,10 +82,19 @@ export const items: Record<ItemId, Item> = {
     addonPrice: 4,
     standalone: false,
   },
+  letter: {
+    id: 'letter',
+    name: { ar: 'رسالة حبّوك السرية', en: 'Habbouk’s secret letter' },
+    desc: { ar: 'مغلّف مختوم فيه رسالة من حبّوك باسم طفلك، يمنحه فيها درع الشجاعة وتاج البطولة.', en: 'A sealed envelope with a letter from Habbouk to your child by name, awarding the shield of courage and the crown of heroes.' },
+    personalized: true,
+    status: 'available',
+    addonPrice: null,
+    standalone: false,
+  },
   cards: {
     id: 'cards',
     name: { ar: 'بطاقات حبكتك', en: 'Hobka Talk cards' },
-    desc: { ar: 'أسئلة وتحديات من حبّوك، مستوحاة من العلاج السلوكي المعرفي، تفتح الحوار مع طفلك.', en: 'Questions and challenges from Habbouk, inspired by CBT, to open conversations with your child.' },
+    desc: { ar: 'بطاقات «ذاكرة وتراث» يسأل فيها طفلك جدّه وجدّته عن طفولتهما، وبطاقات «مهمة» فيها تحديات صغيرة ممتعة. تقرّب العائلة وتبني ثقة الطفل وحواره، ومستوحاة من العلاج السلوكي المعرفي.', en: '“Memory & heritage” cards where your child asks their grandparents about their childhood, and “Mission” cards with small fun challenges. They bring the family closer and build confidence and conversation, inspired by CBT.' },
     personalized: false,
     status: 'available',
     addonPrice: 7,
@@ -146,14 +156,14 @@ export const boxes: Box[] = [
     name: { ar: 'صندوق القصة', en: 'Story box' },
     tagline: { ar: 'البداية: قصة طفلك وستيكراته', en: "The start: your child's story and stickers" },
     price: 25, // PLACEHOLDER
-    includes: ['story', 'stickers'],
+    includes: ['story', 'stickers', 'letter'],
   },
   {
     id: 'hobka',
     name: { ar: 'صندوق حبكة', en: 'Hobka box' },
     tagline: { ar: 'الأكثر اختياراً: قصة ونشاطات تكمل الحكاية', en: 'Most chosen: the story plus activities that continue it' },
     price: 35, // PLACEHOLDER
-    includes: ['story', 'stickers', 'cards', 'planting'],
+    includes: ['story', 'stickers', 'letter', 'cards', 'planting'],
     popular: true,
   },
   {
@@ -161,11 +171,13 @@ export const boxes: Box[] = [
     name: { ar: 'الصندوق الكامل', en: 'Full box' },
     tagline: { ar: 'كل شيء، مع بازل غلاف القصة', en: 'Everything, plus the story cover puzzle' },
     price: 45, // PLACEHOLDER
-    includes: ['story', 'stickers', 'cards', 'planting', 'puzzle', 'figure3d', 'newspaper'],
+    includes: ['story', 'stickers', 'letter', 'cards', 'planting', 'puzzle', 'figure3d', 'newspaper'],
   },
 ];
 
 // ─────────────────────────────── الشحن (لكل محافظة، بالدولار)
+// ⚠️ أسعار تقريبية: السعر النهائي تحدده شركة الشحن، ويمكنك تعديله لكل طلب من لوحة الإدارة.
+// الترتيب: ريف دمشق الأرخص، ثم دمشق، ثم باقي المحافظات.
 export interface Governorate {
   id: string;
   name: Text;
@@ -173,17 +185,17 @@ export interface Governorate {
 }
 
 export const governorates: Governorate[] = [
-  { id: 'damascus', name: { ar: 'دمشق', en: 'Damascus' }, shipping: 2 },
-  { id: 'rif-dimashq', name: { ar: 'ريف دمشق', en: 'Rif Dimashq' }, shipping: 3 },
-  { id: 'aleppo', name: { ar: 'حلب', en: 'Aleppo' }, shipping: 5 },
-  { id: 'homs', name: { ar: 'حمص', en: 'Homs' }, shipping: 4 },
-  { id: 'hama', name: { ar: 'حماة', en: 'Hama' }, shipping: 4 },
-  { id: 'latakia', name: { ar: 'اللاذقية', en: 'Latakia' }, shipping: 5 },
-  { id: 'tartus', name: { ar: 'طرطوس', en: 'Tartus' }, shipping: 5 },
-  { id: 'idlib', name: { ar: 'إدلب', en: 'Idlib' }, shipping: 6 },
-  { id: 'daraa', name: { ar: 'درعا', en: 'Daraa' }, shipping: 4 },
-  { id: 'as-suwayda', name: { ar: 'السويداء', en: 'As-Suwayda' }, shipping: 4 },
-  { id: 'quneitra', name: { ar: 'القنيطرة', en: 'Quneitra' }, shipping: 4 },
+  { id: 'rif-dimashq', name: { ar: 'ريف دمشق', en: 'Rif Dimashq' }, shipping: 2 },
+  { id: 'damascus', name: { ar: 'دمشق', en: 'Damascus' }, shipping: 3 },
+  { id: 'homs', name: { ar: 'حمص', en: 'Homs' }, shipping: 5 },
+  { id: 'hama', name: { ar: 'حماة', en: 'Hama' }, shipping: 5 },
+  { id: 'daraa', name: { ar: 'درعا', en: 'Daraa' }, shipping: 5 },
+  { id: 'as-suwayda', name: { ar: 'السويداء', en: 'As-Suwayda' }, shipping: 5 },
+  { id: 'quneitra', name: { ar: 'القنيطرة', en: 'Quneitra' }, shipping: 5 },
+  { id: 'aleppo', name: { ar: 'حلب', en: 'Aleppo' }, shipping: 6 },
+  { id: 'latakia', name: { ar: 'اللاذقية', en: 'Latakia' }, shipping: 6 },
+  { id: 'tartus', name: { ar: 'طرطوس', en: 'Tartus' }, shipping: 6 },
+  { id: 'idlib', name: { ar: 'إدلب', en: 'Idlib' }, shipping: 7 },
   { id: 'deir-ez-zor', name: { ar: 'دير الزور', en: 'Deir ez-Zor' }, shipping: 7 },
   { id: 'raqqa', name: { ar: 'الرقة', en: 'Raqqa' }, shipping: 7 },
   { id: 'hasakah', name: { ar: 'الحسكة', en: 'Al-Hasakah' }, shipping: 7 },
@@ -194,26 +206,26 @@ export interface StoryValue {
   id: string;
   name: Text;
   desc: Text;
-  emoji: string;
+  icon: string;
 }
 
 export const storyValues: StoryValue[] = [
-  { id: 'prayer', emoji: '🕌', name: { ar: 'حبّ الصلاة', en: 'Loving prayer' }, desc: { ar: 'يكتشف أن الصلاة نور وقوة، لا واجب ثقيل.', en: 'Discovers prayer as light and strength, not a chore.' } },
-  { id: 'courage', emoji: '🦁', name: { ar: 'الشجاعة ومواجهة الخوف', en: 'Courage and facing fears' }, desc: { ar: 'من الظلام أو الطبيب أو المدرسة الجديدة.', en: 'Of the dark, the doctor or a new school.' } },
-  { id: 'confidence', emoji: '🌟', name: { ar: 'الثقة بالنفس وتجاوز الخجل', en: 'Confidence and shyness' }, desc: { ar: 'يجد صوته ويؤمن بقدراته.', en: 'Finds their voice and believes in themselves.' } },
-  { id: 'focus', emoji: '🎯', name: { ar: 'التركيز وإنهاء المهمة', en: 'Focus and finishing tasks' }, desc: { ar: 'يتعلم أن يكمل ما بدأه خطوة بخطوة.', en: 'Learns to finish what they start, step by step.' } },
-  { id: 'honesty', emoji: '🤍', name: { ar: 'الصدق', en: 'Honesty' }, desc: { ar: 'يكتشف أن الصدق يجعل القلب خفيفاً.', en: 'Finds that honesty makes the heart light.' } },
-  { id: 'sharing', emoji: '🎁', name: { ar: 'المشاركة والكرم', en: 'Sharing and generosity' }, desc: { ar: 'يتعلم فرحة العطاء مع إخوته وأصدقائه.', en: 'Learns the joy of giving with siblings and friends.' } },
-  { id: 'parents', emoji: '🏡', name: { ar: 'برّ الوالدين واحترام الكبار', en: 'Kindness to parents and elders' }, desc: { ar: 'يقدّر تعب أهله ويعبّر عن حبه لهم.', en: 'Appreciates their parents and shows love.' } },
-  { id: 'responsibility', emoji: '🧺', name: { ar: 'الترتيب والمسؤولية', en: 'Tidiness and responsibility' }, desc: { ar: 'غرفته وأغراضه وواجباته الصغيرة.', en: 'Their room, belongings and small duties.' } },
-  { id: 'patience', emoji: '🌱', name: { ar: 'الصبر وتهدئة الغضب', en: 'Patience and calming anger' }, desc: { ar: 'يتعلم أن يتنفس ويهدأ قبل أن يتصرف.', en: 'Learns to breathe and calm down before acting.' } },
-  { id: 'sibling', emoji: '👶', name: { ar: 'استقبال أخ أو أخت جديدة', en: 'Welcoming a new sibling' }, desc: { ar: 'يصبح الأخ الكبير البطل.', en: 'Becomes the hero big sibling.' } },
-  { id: 'sleep', emoji: '🌙', name: { ar: 'النوم وحده بهدوء', en: 'Sleeping alone calmly' }, desc: { ar: 'غرفته مكان آمن ودافئ.', en: 'Their room is a safe, warm place.' } },
-  { id: 'screens', emoji: '📱', name: { ar: 'التوازن مع الشاشات', en: 'Balance with screens' }, desc: { ar: 'يكتشف متعة اللعب والعالم خارج الشاشة.', en: 'Discovers the fun beyond the screen.' } },
-  { id: 'friendship', emoji: '🤝', name: { ar: 'الصداقة والتعاون', en: 'Friendship and teamwork' }, desc: { ar: 'يكوّن أصدقاء ويعرف قيمة العمل معاً.', en: 'Makes friends and values working together.' } },
-  { id: 'learning', emoji: '📚', name: { ar: 'حبّ القراءة والتعلّم', en: 'Loving reading and learning' }, desc: { ar: 'كل كتاب باب لمغامرة جديدة.', en: 'Every book is a door to adventure.' } },
-  { id: 'food', emoji: '🥕', name: { ar: 'الطعام الصحي', en: 'Healthy eating' }, desc: { ar: 'يجرب أطعمة جديدة ويحبها.', en: 'Tries new foods and enjoys them.' } },
-  { id: 'gratitude', emoji: '☀️', name: { ar: 'الامتنان والرضا', en: 'Gratitude' }, desc: { ar: 'يرى النعم الصغيرة من حوله.', en: 'Notices the small blessings around them.' } },
+  { id: 'prayer', icon: 'mosque', name: { ar: 'حبّ الصلاة', en: 'Loving prayer' }, desc: { ar: 'يكتشف أن الصلاة نور وقوة، لا واجب ثقيل.', en: 'Discovers prayer as light and strength, not a chore.' } },
+  { id: 'courage', icon: 'shield', name: { ar: 'الشجاعة ومواجهة الخوف', en: 'Courage and facing fears' }, desc: { ar: 'من الظلام أو الطبيب أو المدرسة الجديدة.', en: 'Of the dark, the doctor or a new school.' } },
+  { id: 'confidence', icon: 'star', name: { ar: 'الثقة بالنفس وتجاوز الخجل', en: 'Confidence and shyness' }, desc: { ar: 'يجد صوته ويؤمن بقدراته.', en: 'Finds their voice and believes in themselves.' } },
+  { id: 'focus', icon: 'target', name: { ar: 'التركيز وإنهاء المهمة', en: 'Focus and finishing tasks' }, desc: { ar: 'يتعلم أن يكمل ما بدأه خطوة بخطوة.', en: 'Learns to finish what they start, step by step.' } },
+  { id: 'honesty', icon: 'heart', name: { ar: 'الصدق', en: 'Honesty' }, desc: { ar: 'يكتشف أن الصدق يجعل القلب خفيفاً.', en: 'Finds that honesty makes the heart light.' } },
+  { id: 'sharing', icon: 'gift', name: { ar: 'المشاركة والكرم', en: 'Sharing and generosity' }, desc: { ar: 'يتعلم فرحة العطاء مع إخوته وأصدقائه.', en: 'Learns the joy of giving with siblings and friends.' } },
+  { id: 'parents', icon: 'home', name: { ar: 'برّ الوالدين واحترام الكبار', en: 'Kindness to parents and elders' }, desc: { ar: 'يقدّر تعب أهله ويعبّر عن حبه لهم.', en: 'Appreciates their parents and shows love.' } },
+  { id: 'responsibility', icon: 'basket', name: { ar: 'الترتيب والمسؤولية', en: 'Tidiness and responsibility' }, desc: { ar: 'غرفته وأغراضه وواجباته الصغيرة.', en: 'Their room, belongings and small duties.' } },
+  { id: 'patience', icon: 'sprout', name: { ar: 'الصبر وتهدئة الغضب', en: 'Patience and calming anger' }, desc: { ar: 'يتعلم أن يتنفس ويهدأ قبل أن يتصرف.', en: 'Learns to breathe and calm down before acting.' } },
+  { id: 'sibling', icon: 'baby', name: { ar: 'استقبال أخ أو أخت جديدة', en: 'Welcoming a new sibling' }, desc: { ar: 'يصبح الأخ الكبير البطل.', en: 'Becomes the hero big sibling.' } },
+  { id: 'sleep', icon: 'moon', name: { ar: 'النوم وحده بهدوء', en: 'Sleeping alone calmly' }, desc: { ar: 'غرفته مكان آمن ودافئ.', en: 'Their room is a safe, warm place.' } },
+  { id: 'screens', icon: 'screen', name: { ar: 'التوازن مع الشاشات', en: 'Balance with screens' }, desc: { ar: 'يكتشف متعة اللعب والعالم خارج الشاشة.', en: 'Discovers the fun beyond the screen.' } },
+  { id: 'friendship', icon: 'hands', name: { ar: 'الصداقة والتعاون', en: 'Friendship and teamwork' }, desc: { ar: 'يكوّن أصدقاء ويعرف قيمة العمل معاً.', en: 'Makes friends and values working together.' } },
+  { id: 'learning', icon: 'book', name: { ar: 'حبّ القراءة والتعلّم', en: 'Loving reading and learning' }, desc: { ar: 'كل كتاب باب لمغامرة جديدة.', en: 'Every book is a door to adventure.' } },
+  { id: 'food', icon: 'apple', name: { ar: 'الطعام الصحي', en: 'Healthy eating' }, desc: { ar: 'يجرب أطعمة جديدة ويحبها.', en: 'Tries new foods and enjoys them.' } },
+  { id: 'gratitude', icon: 'sun', name: { ar: 'الامتنان والرضا', en: 'Gratitude' }, desc: { ar: 'يرى النعم الصغيرة من حوله.', en: 'Notices the small blessings around them.' } },
 ];
 
 /** أقصى عدد قيم يختارها الأهل في قصة واحدة */

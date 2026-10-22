@@ -3,7 +3,7 @@ import Base from '../../layouts/Base.astro';
 import { loadCatalog } from '../../lib/catalog';
 import Icon from '../../components/Icon.astro';
 import { contact, type Lang } from '../../config/catalog';
-import { activeItems } from '../../lib/pricing';
+import { activeItems, productImage } from '../../lib/pricing';
 import { path } from '../../i18n/ui';
 export const prerender = false;
 if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
@@ -39,7 +39,8 @@ const with_ = activeItems(catalog).filter((i) => i.id !== 'story');
     <ul class="where">
       {with_.map((it) => (
         <li>
-          {it.id === 'letter' && <img src="/images/habbouk-badge.webp" width="560" height="560" alt="" loading="lazy" class="badge-img" />}
+          {productImage('item', it) ? <img src={productImage('item', it)!} width="600" height="450" alt={it.name[lang]} loading="lazy" class="item-img" />
+            : it.id === 'letter' && <img src="/images/habbouk-badge.webp" width="560" height="560" alt="" loading="lazy" class="badge-img" />}
           <h3>{it.name[lang]} {it.status === 'soon' && <span class="badge badge-soon">{ar ? 'قريباً' : 'soon'}</span>}</h3>
           <p class="muted">{it.desc[lang]}</p>
         </li>
@@ -64,6 +65,8 @@ const with_ = activeItems(catalog).filter((i) => i.id !== 'story');
   .hb { padding-block: var(--space-12) var(--space-16); max-width: 1000px; }
   .intro { display: grid; grid-template-columns: auto 1fr; gap: clamp(1.5rem, 5vw, 4rem); align-items: center; margin-bottom: var(--space-16); }
   .badge-img { width: 96px; height: 96px; object-fit: cover; border-radius: 50%; margin-bottom: var(--space-3); }
+  .item-img { width: calc(100% + 2 * var(--space-6)); max-width: none; margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-4); aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .where li { overflow: hidden; }
   .hb-img { width: clamp(180px, 28vw, 300px); filter: drop-shadow(0 16px 20px rgb(78 13 28 / 20%)); }
   .lead { font-size: 1.2rem; color: var(--color-muted); }
   .where { list-style: none; padding: 0; margin: 0 0 var(--space-16); display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }

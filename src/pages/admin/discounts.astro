@@ -26,6 +26,18 @@ if (Astro.request.method === 'POST') {
       await d.prepare('INSERT INTO discounts (code, kind, value, active, max_uses, used, expires_at, note, created_at) VALUES (?, ?, ?, 1, ?, 0, ?, ?, ?)')
         .bind(code, kind, value, maxUses ? Math.max(1, Math.floor(Number(maxUses))) : null, /^\d{4}-\d{2}-\d{2}$/.test(expires) ? expires : null, String(f.get('note') ?? '').slice(0, 200) || null, now())
         .run();
+    } else if (action === 'update') {
+      const code = String(f.get('code') ?? '');
+      const kind = String(f.get('kind')) === 'fixed' ? 'fixed' : 'percent';
+      const value = Number(f.get('value'));
+      if (!(value > 0) || (kind === 'percent' && value > 100)) throw new Error('قيمة الخصم غير صحيحة.');
+      const maxUses = String(f.get('max_uses') ?? '').trim();
+      const expires = String(f.get('expires_at') ?? '').trim();
+      await d.prepare('UPDATE discounts SET kind = ?, value = ?, max_uses = ?, expires_at = ?, note = ? WHERE code = ?')
+        .bind(kind, value, maxUses ? Math.max(1, Math.floor(Number(maxUses))) : null, /^\d{4}-\d{2}-\d{2}$/.test(expires) ? expires : null, String(f.get('note') ?? '').slice(0, 200) || null, code)
+        .run();
+    } else if (action === 'delete') {
+      await d.prepare('DELETE FROM discounts WHERE code = ?').bind(String(f.get('code') ?? '')).run();
     } else if (action === 'toggle') {
       await d.prepare('UPDATE discounts SET active = 1 - active WHERE code = ?').bind(String(f.get('code'))).run();
     } else throw new Error('إجراء غير معروف');
@@ -71,9 +83,27 @@ const { results: codes } = await d.prepare('SELECT * FROM discounts ORDER BY cre
                 <td>{c.used}{c.max_uses ? ` / ${c.max_uses}` : ''}</td>
                 <td>{c.expires_at ?? '—'}</td>
                 <td>{c.note ?? ''}</td>
-                <td>
+                <td class="acts">
                   <form method="post"><input type="hidden" name="action" value="toggle" /><input type="hidden" name="code" value={c.code} />
                     <button class="abtn" type="submit">{c.active ? 'إيقاف' : 'تفعيل'}</button></form>
+                  <form method="post" onsubmit="return confirm('حذف هذا الكود نهائياً؟ الطلبات التي استخدمته لن تتأثر.')"><input type="hidden" name="action" value="delete" /><input type="hidden" name="code" value={c.code} />
+                    <button class="abtn danger" type="submit">حذف</button></form>
+                </td>
+              </tr>
+              <tr class="editrow">
+                <td colspan="6">
+                  <details>
+                    <summary>تعديل {c.code}</summary>
+                    <form method="post" class="form">
+                      <input type="hidden" name="action" value="update" /><input type="hidden" name="code" value={c.code} />
+                      <div class="afield"><label>النوع</label><select name="kind"><option value="percent" selected={c.kind === 'percent'}>نسبة %</option><option value="fixed" selected={c.kind === 'fixed'}>مبلغ ثابت $</option></select></div>
+                      <div class="afield"><label>القيمة</label><input name="value" type="number" step="0.5" min="0.5" value={c.value} required /></div>
+                      <div class="afield"><label>أقصى عدد استخدامات</label><input name="max_uses" type="number" min="1" value={c.max_uses ?? ''} /></div>
+                      <div class="afield"><label>ينتهي بتاريخ</label><input name="expires_at" type="date" value={c.expires_at ?? ''} /></div>
+                      <div class="afield"><label>ملاحظة</label><input name="note" value={c.note ?? ''} /></div>
+                      <button class="abtn primary" type="submit">حفظ</button>
+                    </form>
+                  </details>
                 </td>
               </tr>
             ))}
@@ -90,4 +120,9 @@ const { results: codes } = await d.prepare('SELECT * FROM discounts ORDER BY cre
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: start; padding: 0.5rem; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
   tr.off { opacity: 0.5; }
+  .acts { display: flex; gap: 0.4rem; }
+  .acts form { margin: 0; }
+  tbody tr:not(.editrow) td { border-bottom: 0; }
+  .editrow td { border-bottom: 1px solid var(--color-border); padding-top: 0; white-space: normal; }
+  .editrow summary { cursor: pointer; color: var(--color-brand); font-size: 0.9rem; }
 </style>

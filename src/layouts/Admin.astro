@@ -22,6 +22,7 @@ const p = Astro.url.pathname;
           <a href="/admin" aria-current={p === '/admin' || p.startsWith('/admin/order') ? 'page' : undefined}>الطلبات</a>
           <a href="/admin/products" aria-current={p.startsWith('/admin/products') ? 'page' : undefined}>المنتجات</a>
           <a href="/admin/discounts" aria-current={p.startsWith('/admin/discounts') ? 'page' : undefined}>أكواد الخصم</a>
+          <a href="/admin/settings" aria-current={p.startsWith('/admin/settings') ? 'page' : undefined}>الإعدادات</a>
           <a href="/" target="_blank">الموقع</a>
           <form method="post" action="/admin/logout"><button type="submit">خروج</button></form>
         </nav>

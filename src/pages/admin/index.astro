@@ -2,12 +2,13 @@
 import Admin from '../../layouts/Admin.astro';
 import { db, type OrderRow } from '../../lib/db';
 import { statuses, type Status } from '../../lib/order';
-import { governorates } from '../../config/catalog';
+import { getSettings } from '../../lib/settings';
 import { money } from '../../lib/pricing';
 import { loadCatalog } from '../../lib/catalog';
 import { orderLines, profit, PAID } from '../../lib/orderLines';
 
 export const prerender = false;
+const { governorates } = await getSettings(Astro.locals);
 
 const status = Astro.url.searchParams.get('status') ?? 'open';
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
@@ -41,6 +42,7 @@ const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: st
 ---
 <Admin title="الطلبات">
   <h1>الطلبات</h1>
+  {Astro.url.searchParams.get('ok') && <p class="flash">{Astro.url.searchParams.get('ok')}</p>}
   <div class="stats">
     <div class="apanel stat"><span class="muted">ربح هذا الشهر (مدفوعة)</span><strong>{money(month.prof)}</strong><span class="muted small">{month.n} طلب · مبيعات {money(month.rev)}</span></div>
     <div class="apanel stat"><span class="muted">الربح الكلي (مدفوعة)</span><strong>{money(allPaid.prof)}</strong><span class="muted small">{allPaid.n} طلب · مبيعات {money(allPaid.rev)}</span></div>

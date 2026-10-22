@@ -1,9 +1,12 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Prose from '../../components/Prose.astro';
-import { timing, type Lang } from '../../config/catalog';
-export function getStaticPaths() { return [{ params: { lang: undefined } }, { params: { lang: 'en' } }]; }
+import { type Lang } from '../../config/catalog';
+import { getSettings } from '../../lib/settings';
+export const prerender = false;
+if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const { timing } = await getSettings(Astro.locals);
 ---
 <Base lang={lang} title={lang === 'ar' ? 'شروط الطلب | حبكة' : 'Order terms | Hobka'} altPath={lang === 'ar' ? '/en/terms' : '/terms'}>
   {lang === 'ar' ? (

@@ -5,7 +5,8 @@ import { loadCatalog } from '../../lib/catalog';
 import { findDiscount } from '../../lib/discount';
 import { db, env, now, logEvent, rateLimit } from '../../lib/db';
 import { clientKey } from '../../lib/auth';
-import { contact, maxPhotos, photoRetentionDays } from '../../config/catalog';
+import { maxPhotos, photoRetentionDays } from '../../config/catalog';
+import { getSettings, activeGovernorates, activeValues } from '../../lib/settings';
 import { sanitizeImage } from '../../lib/image';
 
 export const prerender = false;
@@ -25,6 +26,12 @@ export const POST: APIRoute = async ({ request }) => {
   if (!parsed.success) return fail(422, 'invalid', parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })));
   const o = parsed.data;
   const isBox = o.kind === 'box';
+  const settings = await getSettings();
+  const govs = activeGovernorates(settings);
+  const valueIds = new Set(activeValues(settings).map((v) => v.id));
+  if (!govs.some((g) => g.id === o.parent.governorate)) return fail(422, 'invalid', [{ path: 'parent.governorate', message: 'unknown governorate' }]);
+  if (o.child && (o.child.values.length > settings.maxValues || o.child.values.some((v) => !valueIds.has(v))))
+    return fail(422, 'invalid', [{ path: 'child.values', message: 'unknown value' }]);
 
   // Photos (only for story boxes, only with consent)
   const files = form.getAll('photo').filter((f): f is File => typeof f === 'object' && f !== null && 'arrayBuffer' in f);
@@ -43,7 +50,7 @@ export const POST: APIRoute = async ({ request }) => {
   const discount = o.discountCode ? await findDiscount(o.discountCode) : null;
   if (o.discountCode && !discount) return fail(422, 'discount_invalid');
 
-  const cat = await loadCatalog();
+  const cat = { ...(await loadCatalog()), governorates: govs };
   let price;
   try {
     price = computePrice(cat, { kind: o.kind, box: o.box ?? null, addons: o.addons, governorate: o.parent.governorate }, discount);
@@ -82,6 +89,6 @@ export const POST: APIRoute = async ({ request }) => {
   if (discount) await d.prepare('UPDATE discounts SET used = used + 1 WHERE code = ?').bind(discount.code).run();
   if (orderId) await logEvent(orderId, 'customer', 'created', null);
 
-  const whatsapp = waLink(contact.whatsapp, customerWhatsappText(o.siteLang, code, o.parent.name, isBox && o.photoMode === 'whatsapp'));
+  const whatsapp = waLink(settings.contact.whatsapp, customerWhatsappText(o.siteLang, code, o.parent.name, isBox && o.photoMode === 'whatsapp'));
   return Response.json({ ok: true, code, total: price.total, whatsapp });
 };

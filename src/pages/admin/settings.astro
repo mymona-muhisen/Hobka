@@ -1,0 +1,191 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import Icon from '../../components/Icon.astro';
+import { sameOrigin } from '../../lib/auth';
+import { getSettings, saveSettings, type Settings } from '../../lib/settings';
+import type { StoryValue } from '../../config/catalog';
+
+export const prerender = false;
+
+let error = '';
+const flash = Astro.url.searchParams.get('ok') ?? '';
+const ICONS: [string, string][] = [
+  ['mosque', 'مسجد'], ['shield', 'درع'], ['star', 'نجمة'], ['target', 'هدف'], ['heart', 'قلب'], ['gift', 'هدية'], ['home', 'بيت'],
+  ['basket', 'سلة'], ['sprout', 'نبتة'], ['baby', 'طفل رضيع'], ['moon', 'قمر'], ['screen', 'شاشة'], ['hands', 'أيدٍ'], ['book', 'كتاب'],
+  ['apple', 'تفاحة'], ['sun', 'شمس'], ['sparkle', 'لمعة'], ['camera', 'كاميرا'], ['pencil', 'قلم'], ['check', 'صح'],
+];
+const iconOk = new Set(ICONS.map(([k]) => k));
+const randId = () => 'v-' + Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 6);
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  const f = await Astro.request.formData();
+  const g = (k: string, max = 400) => String(f.get(k) ?? '').trim().slice(0, max);
+  const action = g('action');
+  try {
+    const s: Settings = structuredClone(await getSettings());
+    if (action === 'contact') {
+      const wa = g('whatsapp').replace(/[^0-9]/g, '');
+      if (!/^[1-9][0-9]{7,14}$/.test(wa)) throw new Error('رقم الواتساب: بالصيغة الدولية بدون + أو أصفار في البداية، مثل 963968190380.');
+      const url = (k: string) => { const v = g(k, 300); if (v && !/^https:\/\/[^\s]+$/.test(v)) throw new Error('الروابط يجب أن تبدأ بـ https://'); return v; };
+      s.contact = { whatsapp: wa, whatsappDisplay: g('whatsappDisplay', 30) || '+' + wa, instagram: url('instagram'), facebook: url('facebook') };
+    } else if (action === 'texts') {
+      s.payment = { ar: g('pay_ar', 1000), en: g('pay_en', 1000) || g('pay_ar', 1000) };
+      s.timing = {
+        draftDays: { ar: g('draft_ar', 40) || s.timing.draftDays.ar, en: g('draft_en', 40) || s.timing.draftDays.en },
+        printDays: { ar: g('print_ar', 40) || s.timing.printDays.ar, en: g('print_en', 40) || s.timing.printDays.en },
+      };
+      s.pricesAreFinal = f.get('pricesAreFinal') === 'on';
+      const mv = Math.floor(Number(g('maxValues')));
+      if (!(mv >= 1 && mv <= 5)) throw new Error('عدد القيم المسموح بين 1 و 5.');
+      s.maxValues = mv;
+    } else if (action === 'shipping') {
+      s.governorates = s.governorates.map((gov) => {
+        const v = Number(g(`ship_${gov.id}`).replace(',', '.'));
+        if (!Number.isFinite(v) || v < 0 || v > 500) throw new Error(`سعر الشحن غير صحيح لـ ${gov.name.ar}.`);
+        return { ...gov, shipping: Math.round(v * 100) / 100, hidden: f.get(`hide_${gov.id}`) === 'on' };
+      });
+      if (s.governorates.every((x) => x.hidden)) throw new Error('يجب أن تبقى محافظة واحدة على الأقل ظاهرة.');
+    } else if (action === 'save_value' || action === 'new_value') {
+      if (!g('name_ar', 80)) throw new Error('اسم القيمة بالعربية مطلوب.');
+      const icon = iconOk.has(g('icon')) ? g('icon') : 'star';
+      const v: StoryValue = {
+        id: action === 'new_value' ? randId() : g('id', 40),
+        icon,
+        name: { ar: g('name_ar', 80), en: g('name_en', 80) || g('name_ar', 80) },
+        desc: { ar: g('desc_ar', 200), en: g('desc_en', 200) || g('desc_ar', 200) },
+      };
+      const active = s.values.filter((x) => !x.deleted && x.id !== v.id);
+      const removed = s.values.filter((x) => x.deleted && x.id !== v.id);
+      if (action === 'save_value' && !s.values.some((x) => x.id === v.id)) throw new Error('القيمة غير موجودة.');
+      const pos = Math.max(1, Math.min(active.length + 1, Math.floor(Number(g('pos')) || active.length + 1)));
+      active.splice(pos - 1, 0, v);
+      s.values = [...active, ...removed];
+    } else if (action === 'delete_value') {
+      const id = g('id', 40);
+      // Kept as "deleted" so old orders still show the value's name.
+      s.values = s.values.map((x) => (x.id === id ? { ...x, deleted: true } : x));
+      if (!s.values.some((x) => !x.deleted)) throw new Error('يجب أن تبقى قيمة واحدة على الأقل.');
+    } else throw new Error('إجراء غير معروف');
+    await saveSettings(s);
+    return Astro.redirect('/admin/settings?ok=' + encodeURIComponent('تم الحفظ ✓') + (action.includes('value') ? '#values' : action === 'shipping' ? '#shipping' : ''), 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+const s = await getSettings();
+const values = s.values.filter((v) => !v.deleted);
+---
+<Admin title="الإعدادات">
+  <h1>الإعدادات</h1>
+  {flash && <p class="flash">{flash}</p>}
+  {error && <p class="flash bad" role="alert">{error}</p>}
+  <p class="muted">كل ما هنا يظهر في الموقع فوراً، بدون تعديل ملفات. <a href="#contact">التواصل</a> · <a href="#texts">الدفع والمدد</a> · <a href="#shipping">الشحن</a> · <a href="#values">قيم القصة</a></p>
+
+  <section class="apanel" id="contact">
+    <h2>التواصل</h2>
+    <form method="post" class="sform">
+      <input type="hidden" name="action" value="contact" />
+      <label>رقم الواتساب (دولي، أرقام فقط)<input name="whatsapp" value={s.contact.whatsapp} dir="ltr" inputmode="numeric" required /></label>
+      <label>الرقم كما يظهر للزوار<input name="whatsappDisplay" value={s.contact.whatsappDisplay} dir="ltr" /></label>
+      <label>رابط إنستغرام<input name="instagram" value={s.contact.instagram} dir="ltr" type="url" /></label>
+      <label>رابط فيسبوك<input name="facebook" value={s.contact.facebook} dir="ltr" type="url" /></label>
+      <div class="wide"><button class="abtn primary" type="submit">حفظ</button></div>
+    </form>
+  </section>
+
+  <section class="apanel" id="texts">
+    <h2>الدفع والمدد</h2>
+    <form method="post" class="sform">
+      <input type="hidden" name="action" value="texts" />
+      <label class="wide">تفاصيل الدفع (عربي) <span class="muted">تُرسل للأهل في رسالة «تفاصيل الدفع»</span><textarea name="pay_ar" rows="3">{s.payment.ar}</textarea></label>
+      <label class="wide">تفاصيل الدفع (إنجليزي)<textarea name="pay_en" rows="3" dir="ltr">{s.payment.en}</textarea></label>
+      <label>مدة رسم شكل الطفل (عربي)<input name="draft_ar" value={s.timing.draftDays.ar} /></label>
+      <label>مدة رسم شكل الطفل (إنجليزي)<input name="draft_en" value={s.timing.draftDays.en} dir="ltr" /></label>
+      <label>مدة الطباعة (عربي)<input name="print_ar" value={s.timing.printDays.ar} /></label>
+      <label>مدة الطباعة (إنجليزي)<input name="print_en" value={s.timing.printDays.en} dir="ltr" /></label>
+      <label>أقصى عدد قيم في القصة الواحدة<input name="maxValues" type="number" min="1" max="5" value={s.maxValues} /></label>
+      <label class="cb"><input type="checkbox" name="pricesAreFinal" checked={s.pricesAreFinal} />الأسعار نهائية (تُخفي ملاحظة «أسعار مبدئية»)</label>
+      <div class="wide"><button class="abtn primary" type="submit">حفظ</button></div>
+    </form>
+  </section>
+
+  <section class="apanel" id="shipping">
+    <h2>أسعار الشحن</h2>
+    <p class="muted small">أسعار تقريبية تظهر للأهل عند الطلب، ويمكنك تعديل الشحن لكل طلب من صفحته. «إخفاء» يزيل المحافظة من قائمة الطلب.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="shipping" />
+      <div class="ship">
+        {s.governorates.map((gov) => (
+          <div class:list={['srow', { off: gov.hidden }]}>
+            <span class="gname">{gov.name.ar}</span>
+            <label class="sr-only" for={`ship_${gov.id}`}>سعر الشحن إلى {gov.name.ar}</label>
+            <input id={`ship_${gov.id}`} name={`ship_${gov.id}`} type="number" step="0.5" min="0" value={gov.shipping} inputmode="decimal" />
+            <span class="muted">$</span>
+            <label class="cb"><input type="checkbox" name={`hide_${gov.id}`} checked={!!gov.hidden} />إخفاء</label>
+          </div>
+        ))}
+      </div>
+      <button class="abtn primary" type="submit">حفظ أسعار الشحن</button>
+    </form>
+  </section>
+
+  <section class="apanel" id="values">
+    <h2>قيم القصة الجاهزة</h2>
+    <p class="muted small">القيم التي يختار منها الأهل في خطوة «الحكاية». حذف قيمة يزيلها من صفحة الطلب، والطلبات القديمة تبقى تعرض اسمها.</p>
+    {values.map((v, i) => (
+      <details class="val">
+        <summary><span class="vi"><Icon name={v.icon} /></span><strong>{v.name.ar}</strong><span class="muted small">{v.desc.ar}</span></summary>
+        <form method="post" class="sform">
+          <input type="hidden" name="action" value="save_value" /><input type="hidden" name="id" value={v.id} />
+          <label>الاسم (عربي)<input name="name_ar" value={v.name.ar} required maxlength="80" /></label>
+          <label>الاسم (إنجليزي)<input name="name_en" value={v.name.en} dir="ltr" maxlength="80" /></label>
+          <label>وصف قصير (عربي)<input name="desc_ar" value={v.desc.ar} maxlength="200" /></label>
+          <label>وصف قصير (إنجليزي)<input name="desc_en" value={v.desc.en} dir="ltr" maxlength="200" /></label>
+          <label>الأيقونة<select name="icon">{ICONS.map(([k, n]) => <option value={k} selected={v.icon === k}>{n}</option>)}</select></label>
+          <label>الترتيب<input name="pos" type="number" min="1" max={values.length} value={i + 1} /></label>
+          <div class="wide acts"><button class="abtn primary" type="submit">حفظ</button></div>
+        </form>
+        <form method="post" class="del" onsubmit="return confirm('حذف هذه القيمة من صفحة الطلب؟')">
+          <input type="hidden" name="action" value="delete_value" /><input type="hidden" name="id" value={v.id} />
+          <button class="abtn danger" type="submit">حذف القيمة</button>
+        </form>
+      </details>
+    ))}
+    <details class="val new">
+      <summary><strong>+ إضافة قيمة جديدة</strong></summary>
+      <form method="post" class="sform">
+        <input type="hidden" name="action" value="new_value" />
+        <label>الاسم (عربي)<input name="name_ar" required maxlength="80" /></label>
+        <label>الاسم (إنجليزي)<input name="name_en" dir="ltr" maxlength="80" /></label>
+        <label>وصف قصير (عربي)<input name="desc_ar" maxlength="200" /></label>
+        <label>وصف قصير (إنجليزي)<input name="desc_en" dir="ltr" maxlength="200" /></label>
+        <label>الأيقونة<select name="icon">{ICONS.map(([k, n]) => <option value={k}>{n}</option>)}</select></label>
+        <label>الترتيب<input name="pos" type="number" min="1" max={values.length + 1} value={values.length + 1} /></label>
+        <div class="wide"><button class="abtn primary" type="submit">إضافة</button></div>
+      </form>
+    </details>
+  </section>
+</Admin>
+<style>
+  .small { font-size: 0.88rem; }
+  .sform { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; }
+  .sform label { display: grid; gap: 0.25rem; font-weight: 600; font-size: 0.92rem; }
+  .sform input:not([type='checkbox']), .sform select, .sform textarea, .ship input[type='number'] { font: inherit; font-weight: 400; padding: 0.55rem 0.75rem; border: 1.5px solid var(--color-border); border-radius: 12px; background: var(--color-paper); width: 100%; }
+  .sform .wide { grid-column: 1 / -1; }
+  .cb { display: flex !important; align-items: center; gap: 0.5rem; font-weight: 500 !important; }
+  .cb input { width: 18px; height: 18px; accent-color: var(--color-brand); }
+  .ship { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.5rem 1.25rem; margin-bottom: 1rem; }
+  .srow { display: grid; grid-template-columns: 1fr 90px auto auto; gap: 0.5rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid var(--color-border); }
+  .srow.off .gname { text-decoration: line-through; color: var(--color-muted); }
+  .val { border: 1px solid var(--color-border); border-radius: 14px; margin-bottom: 0.5rem; background: #fff; }
+  .val summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; padding: 0.7rem 1rem; list-style: none; }
+  .val summary::-webkit-details-marker { display: none; }
+  .val.new summary { color: var(--color-brand); }
+  .val form { padding: 0 1rem 1rem; }
+  .vi { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--color-rose-soft); color: var(--color-brand); }
+  .vi :global(svg) { width: 18px; height: 18px; }
+  .acts { display: flex; gap: 0.5rem; }
+  @media (max-width: 640px) { .sform { grid-template-columns: 1fr; } }
+</style>

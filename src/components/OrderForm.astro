@@ -2,15 +2,17 @@
 import Icon from './Icon.astro';
 import { orderUi } from '../i18n/order';
 import { fill, path } from '../i18n/ui';
-import {
-  governorates, storyValues, maxValues, maxPhotos, photoRetentionDays, ages, storyLanguages,
-  artStyles, stylesEnabled, timing, pricesAreFinal, type Lang, type Catalog,
-} from '../config/catalog';
-import { money, publicCatalog } from '../lib/pricing';
+import { maxPhotos, photoRetentionDays, ages, storyLanguages, artStyles, stylesEnabled, type Lang, type Catalog } from '../config/catalog';
+import { money, publicCatalog, productImage } from '../lib/pricing';
+import { getSettings, activeGovernorates, activeValues } from '../lib/settings';
 
 interface Props { lang: Lang; catalog: Catalog }
 const { lang } = Astro.props;
-const catalog = publicCatalog(Astro.props.catalog);
+const settings = await getSettings(Astro.locals);
+const { timing, pricesAreFinal, maxValues } = settings;
+const storyValues = activeValues(settings);
+const governorates = activeGovernorates(settings);
+const catalog = { ...publicCatalog({ ...Astro.props.catalog, governorates }), values: storyValues.map(({ id, name }) => ({ id, name })), maxValues };
 const items = catalog.items;
 const boxes = catalog.boxes;
 const t = orderUi[lang];
@@ -41,9 +43,10 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
         <h2>{t.kindTitle}</h2>
         <div class="choice-grid" role="radiogroup" aria-label={t.kindTitle}>
           {boxes.map((b) => (
-            <label class="choice box-choice">
+            <label class:list={['choice box-choice', { 'has-img': productImage('box', b) }]}>
               <input type="radio" name="box" value={b.id} />
               <span class="choice-body">
+                {productImage('box', b) && <img class="c-img" src={productImage('box', b)!} alt="" loading="lazy" width="400" height="300" />}
                 <span class="choice-top"><strong>{b.name[lang]}</strong><span class="choice-price">{money(b.price, lang)}</span></span>
                 <span class="muted small">{b.includes.filter((id) => items[id].status === 'available').map((id) => items[id].name[lang]).join('، ')}</span>
                 {b.includes.some((id) => items[id].status === 'soon') && (
@@ -199,8 +202,13 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
             <label class="choice addon" data-addon={it.id} data-standalone={String(it.standalone)}>
               <input type="checkbox" name="addons" value={it.id} />
               <span class="choice-body">
-                <span class="choice-top"><strong>{it.name[lang]}</strong><span class="choice-price">+{money(it.addonPrice ?? 0, lang)}</span></span>
-                <span class="muted small">{it.desc[lang]}</span>
+                <span class="addon-row">
+                  {productImage('item', it) && <img class="a-img" src={productImage('item', it)!} alt="" loading="lazy" width="72" height="72" />}
+                  <span class="addon-text">
+                    <span class="choice-top"><strong>{it.name[lang]}</strong><span class="choice-price">+{money(it.addonPrice ?? 0, lang)}</span></span>
+                    <span class="muted small">{it.desc[lang]}</span>
+                  </span>
+                </span>
               </span>
             </label>
           ))}
@@ -305,10 +313,13 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
 <script type="application/json" id="order-catalog" set:html={JSON.stringify(catalog).replace(/</g, '\\u003c')} />
 
 <script>
-  import { governorates, storyValues, maxValues, maxPhotos, type ItemId, type Catalog } from '../config/catalog';
+  import { maxPhotos, type ItemId, type Catalog, type Text } from '../config/catalog';
   import { computePrice, allowedAddons, money, type Discount } from '../lib/pricing';
 
-  const CAT = JSON.parse(document.getElementById('order-catalog')!.textContent!) as Catalog;
+  const CAT = JSON.parse(document.getElementById('order-catalog')!.textContent!) as Catalog & { values: { id: string; name: Text }[]; maxValues: number };
+  const governorates = CAT.governorates ?? [];
+  const storyValues = CAT.values;
+  const maxValues = CAT.maxValues;
   const items = CAT.items;
   const boxes = CAT.boxes;
 
@@ -703,6 +714,10 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   .choice-top { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
   .choice-price { font-family: var(--font-display); font-weight: 800; color: var(--color-brand-dark); white-space: nowrap; }
   .only-choice { grid-column: 1 / -1; }
+  .c-img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; margin-bottom: var(--space-2); }
+  .addon-row { display: flex; gap: var(--space-3); align-items: flex-start; }
+  .addon-text { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; min-width: 0; }
+  .a-img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; flex: none; }
   .only-choice .choice-body { background: var(--color-white); border-style: dashed; }
 
   .seg { display: flex; gap: var(--space-2); flex-wrap: wrap; }

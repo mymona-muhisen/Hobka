@@ -1,4 +1,4 @@
-import { governorates, type BoxId, type Catalog, type ItemId } from '../config/catalog';
+import { governorates as defaultGovernorates, type BoxId, type Catalog, type ItemId } from '../config/catalog';
 
 export interface Discount {
   code: string;
@@ -58,7 +58,7 @@ export function computePrice(c: Catalog, input: PriceInput, discount?: Discount 
   }
   const subtotal = round(lines.reduce((s, l) => s + l.amount, 0));
   const cost = round(lines.reduce((s, l) => s + l.cost, 0));
-  const gov = governorates.find((g) => g.id === input.governorate);
+  const gov = (c.governorates ?? defaultGovernorates).find((g) => g.id === input.governorate);
   const shipping = gov ? gov.shipping : 0;
   let off = 0;
   if (discount) {
@@ -77,5 +77,8 @@ export function money(n: number, lang: 'ar' | 'en' = 'ar'): string {
 export function publicCatalog(c: Catalog): Catalog {
   const items = Object.fromEntries(activeItems(c).map((i) => [i.id, { ...i, cost: 0 }]));
   const boxes = activeBoxes(c).map((b) => ({ ...b, cost: 0, includes: b.includes.filter((id) => items[id]) }));
-  return { items, boxes };
+  return { items, boxes, governorates: c.governorates?.map(({ id, name, shipping }) => ({ id, name, shipping })) };
 }
+
+/** Public URL of a product photo, or null. */
+export const productImage = (kind: 'item' | 'box', p: { id: string; image?: number }) => (p.image ? `/pimg/${kind}/${p.id}/${p.image}` : null);

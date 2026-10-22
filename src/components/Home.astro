@@ -2,14 +2,16 @@
 import Icon from './Icon.astro';
 import heart from '../assets/heart.svg?raw';
 import { ui, path, fill } from '../i18n/ui';
-import { contact, timing, photoRetentionDays, pricesAreFinal, type Lang, type Catalog } from '../config/catalog';
-import { money, activeBoxes } from '../lib/pricing';
+import { contact, photoRetentionDays, type Lang, type Catalog } from '../config/catalog';
+import { money, activeBoxes, productImage } from '../lib/pricing';
+import { getSettings } from '../lib/settings';
 
 interface Props { lang: Lang; catalog: Catalog }
 const { lang, catalog } = Astro.props;
 const items = catalog.items;
 const boxes = activeBoxes(catalog);
 const t = ui[lang];
+const { timing, pricesAreFinal } = await getSettings(Astro.locals);
 const vars = { draft: timing.draftDays[lang], print: timing.printDays[lang], days: photoRetentionDays };
 const orderHref = path(lang, '/order');
 const standalone = Object.values(items).filter((i) => i.standalone && i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
@@ -60,6 +62,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
       {boxes.map((b) => (
         <article class:list={['box', { popular: b.popular }]}>
           {b.popular && <span class="badge pop">{t.boxes.popular}</span>}
+          {productImage('box', b) && <img class="box-img" src={productImage('box', b)!} alt={b.name[lang]} loading="lazy" width="600" height="450" />}
           <h3>{b.name[lang]}</h3>
           <p class="tagline">{b.tagline[lang]}</p>
           <p class="price"><span>{money(b.price, lang)}</span><small>{t.boxes.shipping}</small></p>
@@ -84,7 +87,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
         <p class="muted">{t.standalone.sub}</p>
       </div>
       <ul>
-        {standalone.map((s) => <li><strong>{s.name[lang]}</strong> <span class="muted">{money(s.addonPrice ?? 0, lang)}</span></li>)}
+        {standalone.map((s) => <li>{productImage('item', s) && <img class="sa-img" src={productImage('item', s)!} alt="" loading="lazy" width="48" height="48" />}<span><strong>{s.name[lang]}</strong> <span class="muted">{money(s.addonPrice ?? 0, lang)}</span></span></li>)}
       </ul>
       <a class="btn btn-secondary" href={`${orderHref}?only=1`}>{t.standalone.cta}</a>
     </div>
@@ -204,8 +207,10 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   /* Boxes */
   .boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); align-items: stretch; }
   .box { position: relative; display: flex; flex-direction: column; background: var(--color-white); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-8) var(--space-6) var(--space-6); }
+  .box-img { width: calc(100% + 2 * var(--space-6) - 2px); max-width: none; margin: calc(-1 * var(--space-8) + 1px) calc(-1 * var(--space-6) + 1px) var(--space-4); aspect-ratio: 4 / 3; object-fit: cover; border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0; }
+  .box.popular .box-img { width: calc(100% + 2 * var(--space-6) - 4px); margin-inline: calc(-1 * var(--space-6) + 2px); margin-top: calc(-1 * var(--space-8) + 2px); }
   .box.popular { border: 2px solid var(--color-brand); box-shadow: var(--shadow-lift); background: linear-gradient(180deg, var(--color-rose-soft), var(--color-white) 40%); }
-  .pop { position: absolute; top: -14px; inset-inline-start: var(--space-6); background: var(--color-brand); color: #fff; }
+  .pop { position: absolute; z-index: 1; top: -14px; inset-inline-start: var(--space-6); background: var(--color-brand); color: #fff; }
   .tagline { color: var(--color-muted); min-height: 3.4em; }
   .price { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-4); }
   .price span { font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; color: var(--color-brand-dark); line-height: 1; }
@@ -220,7 +225,9 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   .st-img { width: 200px; height: 120px; object-fit: cover; border-radius: var(--radius-md); }
   .standalone h3 { margin-bottom: var(--space-1); }
   .standalone p { margin: 0; }
-  .standalone ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+  .standalone ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .standalone li { display: flex; align-items: center; gap: var(--space-3); }
+  .sa-img { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: none; }
 
   /* How */
   .how { background: var(--color-white); }

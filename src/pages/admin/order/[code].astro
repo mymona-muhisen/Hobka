@@ -4,7 +4,8 @@ import Icon from '../../../components/Icon.astro';
 import { db, env, now, logEvent, type OrderRow } from '../../../lib/db';
 import { sameOrigin } from '../../../lib/auth';
 import { statuses, waLink, toIntl, type Status, type ChildInput } from '../../../lib/order';
-import { governorates, storyValues, artStyles, payment, timing, photoRetentionDays } from '../../../config/catalog';
+import { artStyles, photoRetentionDays } from '../../../config/catalog';
+import { getSettings } from '../../../lib/settings';
 import { loadCatalog } from '../../../lib/catalog';
 import { orderLines, revenue, profit } from '../../../lib/orderLines';
 import { money } from '../../../lib/pricing';
@@ -19,6 +20,10 @@ let order = await load();
 if (!order) return new Response('الطلب غير موجود', { status: 404 });
 
 const DRAFT_TTL = 120 * 24 * 3600;
+const settings = await getSettings(Astro.locals);
+const { governorates, timing } = settings;
+const storyValues = settings.values;
+const payment = { instructions: settings.payment };
 let flash = Astro.url.searchParams.get('ok') ?? '';
 let error = '';
 
@@ -63,6 +68,27 @@ if (Astro.request.method === 'POST') {
       await d.prepare("UPDATE orders SET draft_url = ?, draft_message = ?, draft_version = ?, status = 'draft_sent', updated_at = ? WHERE id = ?").bind(url || null, msg || null, version, t, o.id).run();
       if (files.length) await logEvent(o.id, 'admin', 'draft_images', `${version}:${files.length}`);
       await logEvent(o.id, 'admin', 'draft_sent', `نسخة ${version}`);
+    } else if (action === 'delivery') {
+      const g = (k: string, max: number) => String(form.get(k) ?? '').trim().slice(0, max);
+      const gid = g('governorate', 40);
+      if (g('parent_name', 60).length < 2) throw new Error('اسم ولي الأمر قصير.');
+      if (!/^\+?[0-9 ()-]{7,20}$/.test(g('phone', 20))) throw new Error('رقم الهاتف غير صحيح.');
+      if (!governorates.some((x) => x.id === gid)) throw new Error('المحافظة غير معروفة.');
+      if (g('address', 300).length < 4) throw new Error('العنوان قصير.');
+      await d.prepare('UPDATE orders SET parent_name = ?, phone = ?, governorate = ?, address = ?, notes = ?, updated_at = ? WHERE id = ?')
+        .bind(g('parent_name', 60), g('phone', 20), gid, g('address', 300), g('notes', 600) || null, t, o.id).run();
+      await logEvent(o.id, 'admin', 'delivery_edit', null);
+    } else if (action === 'delete_order') {
+      if (String(form.get('confirm_code') ?? '').trim().toUpperCase() !== o.code) throw new Error('اكتبي رقم الطلب كما هو لتأكيد الحذف.');
+      for (let i = 0; i < 10; i++) await env.PHOTOS.delete(`photo:${o.code}:${i}`);
+      let cursor: string | undefined;
+      do {
+        const page = await env.PHOTOS.list({ prefix: `draft:${o.code}:`, cursor });
+        await Promise.all(page.keys.map((k) => env.PHOTOS.delete(k.name)));
+        cursor = page.list_complete ? undefined : page.cursor;
+      } while (cursor);
+      await d.batch([d.prepare('DELETE FROM order_events WHERE order_id = ?').bind(o.id), d.prepare('DELETE FROM orders WHERE id = ?').bind(o.id)]);
+      return Astro.redirect(`/admin?ok=${encodeURIComponent(`حُذف الطلب ${o.code} وكل صوره ✓`)}`, 303);
     } else if (action === 'delete_photos') {
       for (let i = 0; i < 10; i++) await env.PHOTOS.delete(`photo:${o.code}:${i}`);
       await d.prepare('UPDATE orders SET photo_count = 0, updated_at = ? WHERE id = ?').bind(t, o.id).run();
@@ -103,7 +129,7 @@ const msgs = lang === 'en'
       pay: `شكراً لموافقتك على شكل طفلك 💛\nالطلب ${o.code}\nالمبلغ: ${money(o.total, 'ar')}\n${payment.instructions.ar}\nنبدأ الطباعة فور وصول الدفعة.`,
       shipped: `خبر جميل! طلبك ${o.code} في الطريق إليك 📦`,
     };
-const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', status: 'تغيير الحالة', draft_sent: 'أُرسل شكل الطفل', draft_images: 'رسومات الشخصية', approved: 'وافق الأهل على الشكل', changes_requested: 'طلب الأهل تعديلاً', photos_deleted: 'حُذفت الصور', shipping: 'تعديل كلفة الشحن' };
+const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', status: 'تغيير الحالة', draft_sent: 'أُرسل شكل الطفل', draft_images: 'رسومات الشخصية', approved: 'وافق الأهل على الشكل', changes_requested: 'طلب الأهل تعديلاً', photos_deleted: 'حُذفت الصور', shipping: 'تعديل كلفة الشحن', delivery_edit: 'تعديل بيانات التوصيل' };
 ---
 <Admin title={o.code}>
   <p><a href="/admin">→ كل الطلبات</a></p>
@@ -252,6 +278,19 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
           <dt>العنوان</dt><dd class="pre">{o.address}</dd>
           {o.notes && <><dt>ملاحظات</dt><dd class="pre">{o.notes}</dd></>}
         </dl>
+        <details class="edit">
+          <summary>تعديل بيانات التوصيل</summary>
+          <form method="post" class="dform">
+            <input type="hidden" name="action" value="delivery" />
+            <label>الاسم<input name="parent_name" value={o.parent_name} required maxlength="60" /></label>
+            <label>الهاتف<input name="phone" value={o.phone} dir="ltr" required maxlength="20" /></label>
+            <label>المحافظة<select name="governorate">{governorates.map((g) => <option value={g.id} selected={g.id === o.governorate}>{g.name.ar}</option>)}</select></label>
+            <label>العنوان<textarea name="address" rows="2" maxlength="300" required>{o.address}</textarea></label>
+            <label>ملاحظات<textarea name="notes" rows="2" maxlength="600">{o.notes ?? ''}</textarea></label>
+            <button class="abtn" type="submit">حفظ</button>
+          </form>
+          <p class="muted small">تغيير المحافظة لا يغيّر كلفة الشحن تلقائياً؛ عدّليها من قسم «الطلب والمبلغ».</p>
+        </details>
       </section>
 
       <section class="apanel">
@@ -260,6 +299,17 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
           <input type="hidden" name="action" value="notes" />
           <textarea name="admin_notes" rows="3" class="full" aria-label="ملاحظات داخلية">{o.admin_notes ?? ''}</textarea>
           <button class="abtn" type="submit">حفظ الملاحظات</button>
+        </form>
+      </section>
+
+      <section class="apanel danger-zone">
+        <h2>حذف الطلب</h2>
+        <p class="muted small">يحذف الطلب وصور الطفل ورسومات الشخصية نهائياً، ولا يمكن التراجع. مناسب للطلبات التجريبية أو المكررة. لإيقاف طلب حقيقي استخدمي حالة «ملغى» بدلاً من الحذف، كي يبقى في الأرباح والسجل.</p>
+        <form method="post" class="row" onsubmit="return confirm('حذف هذا الطلب نهائياً؟')">
+          <input type="hidden" name="action" value="delete_order" />
+          <label class="sr-only" for="cc">اكتبي رقم الطلب للتأكيد</label>
+          <input id="cc" name="confirm_code" dir="ltr" placeholder={o.code} autocomplete="off" required />
+          <button class="abtn danger" type="submit">حذف نهائي</button>
         </form>
       </section>
 
@@ -320,6 +370,12 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
   .costs label { display: grid; gap: 0.2rem; font-size: 0.85rem; font-weight: 600; }
   .costs input { font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); width: 100%; }
   .lines .neg { color: var(--color-error); }
+  .dform { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+  .dform label { display: grid; gap: 0.2rem; font-size: 0.85rem; font-weight: 600; }
+  .dform input, .dform select, .dform textarea { font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); width: 100%; background: #fff; }
+  .edit summary { cursor: pointer; color: var(--color-brand); font-weight: 700; margin-top: 0.5rem; }
+  .danger-zone { border: 1px solid #f2b8bf; }
+  .danger-zone input { font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); }
   @media (max-width: 520px) { .costs { grid-template-columns: 1fr; } }
   .ship input { flex: 1; font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); max-width: 140px; }
   .lines { list-style: none; padding: 0; margin: 0 0 0.5rem; display: grid; gap: 0.3rem; }

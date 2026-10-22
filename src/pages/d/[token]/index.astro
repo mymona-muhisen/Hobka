@@ -4,12 +4,13 @@ import Logo from '../../../components/Logo.astro';
 import Icon from '../../../components/Icon.astro';
 import { db, type OrderRow } from '../../../lib/db';
 import { statuses, type Status } from '../../../lib/order';
-import { contact } from '../../../config/catalog';
+import { getSettings } from '../../../lib/settings';
 import { loadCatalog } from '../../../lib/catalog';
 import { orderLines } from '../../../lib/orderLines';
 import { money } from '../../../lib/pricing';
 
 export const prerender = false;
+const { contact } = await getSettings(Astro.locals);
 
 const token = Astro.params.token ?? '';
 const d = await db();

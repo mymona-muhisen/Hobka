@@ -11,6 +11,7 @@ export interface D1Stmt {
 export interface D1 { prepare(q: string): D1Stmt; batch(s: D1Stmt[]): Promise<D1Result[]>; exec(q: string): Promise<unknown> }
 export interface KV {
   get(k: string, type: 'arrayBuffer'): Promise<ArrayBuffer | null>;
+  list(o: { prefix: string; cursor?: string }): Promise<{ keys: { name: string }[]; list_complete: boolean; cursor?: string }>;
   getWithMetadata<M>(k: string, type: 'arrayBuffer'): Promise<{ value: ArrayBuffer | null; metadata: M | null }>;
   put(k: string, v: ArrayBuffer | string, o?: { expirationTtl?: number; metadata?: unknown }): Promise<void>;
   delete(k: string): Promise<void>;
@@ -81,6 +82,11 @@ const SCHEMA = [
     deleted INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL,
     PRIMARY KEY (kind, id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS rate_limits (
     key TEXT PRIMARY KEY,

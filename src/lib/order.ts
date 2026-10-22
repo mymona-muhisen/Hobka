@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ages, governorates, maxValues, storyValues, artStyles, type Lang } from '../config/catalog';
+import { ages, artStyles, type Lang } from '../config/catalog';
 
 const productId = z.string().trim().regex(/^[a-z0-9-]{1,40}$/);
 const trim = (max: number) => z.string().trim().max(max);
@@ -9,7 +9,8 @@ export const childSchema = z.object({
   gender: z.enum(['boy', 'girl']),
   age: z.coerce.number().int().min(ages.min).max(ages.max),
   storyLang: z.enum(['ar', 'en']),
-  values: z.array(z.enum(storyValues.map((v) => v.id) as [string, ...string[]])).max(maxValues).default([]),
+  // Checked against the live list (admin settings) in the order API.
+  values: z.array(productId).max(10).default([]),
   valueNote: trim(400).default(''),
   ownIdea: trim(800).default(''),
   appearance: trim(400).default(''),
@@ -29,7 +30,7 @@ export const orderSchema = z
     parent: z.object({
       name: trim(60).min(2),
       phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,20}$/),
-      governorate: z.enum(governorates.map((g) => g.id) as [string, ...string[]]),
+      governorate: productId,
       address: trim(300).min(4),
       notes: trim(600).default(''),
     }),

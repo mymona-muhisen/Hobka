@@ -3,7 +3,8 @@ import Base from '../../layouts/Base.astro';
 import { loadCatalog } from '../../lib/catalog';
 import Home from '../../components/Home.astro';
 import { ui, fill } from '../../i18n/ui';
-import { contact, site, timing, photoRetentionDays } from '../../config/catalog';
+import { site, photoRetentionDays } from '../../config/catalog';
+import { getSettings } from '../../lib/settings';
 import type { Lang } from '../../config/catalog';
 
 export const prerender = false;
@@ -11,6 +12,7 @@ if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, {
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
 const catalog = await loadCatalog();
 const t = ui[lang];
+const { contact, timing } = await getSettings(Astro.locals);
 const vars = { draft: timing.draftDays[lang], print: timing.printDays[lang], days: photoRetentionDays };
 const ld = [
   {

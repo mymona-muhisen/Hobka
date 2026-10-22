@@ -1,9 +1,12 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Prose from '../../components/Prose.astro';
-import { contact, photoRetentionDays as days, type Lang } from '../../config/catalog';
-export function getStaticPaths() { return [{ params: { lang: undefined } }, { params: { lang: 'en' } }]; }
+import { photoRetentionDays as days, type Lang } from '../../config/catalog';
+import { getSettings } from '../../lib/settings';
+export const prerender = false;
+if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
+const { contact } = await getSettings(Astro.locals);
 const wa = `https://wa.me/${contact.whatsapp}`;
 ---
 <Base lang={lang} title={lang === 'ar' ? 'سياسة الخصوصية | حبكة' : 'Privacy policy | Hobka'} altPath={lang === 'ar' ? '/en/privacy' : '/privacy'}>

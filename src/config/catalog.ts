@@ -1,9 +1,9 @@
 /**
- * إعدادات الموقع: القيم، تكاليف الشحن، رقم الواتساب والروابط، نص الدفع.
- * المنتجات والصناديق وأسعارها وتكاليفها تُدار من لوحة الإدارة: /admin/products
- *
- * ⚠️ كل الأسعار هنا مؤقتة (PLACEHOLDER) إلى أن تصل الأرقام الحقيقية.
- * بعد أي تعديل: احفظي الملف وارفعيه إلى GitHub، فيُعاد نشر الموقع تلقائياً.
+ * القيم الأولى للموقع. كل ما يتغير عادةً يُدار الآن من لوحة الإدارة، بدون تعديل هذا الملف:
+ *  - المنتجات والصناديق وصورها وأسعارها وتكاليفها: /admin/products
+ *  - الشحن، قيم القصة، الواتساب والروابط، نص الدفع، المدد: /admin/settings
+ * القيم هنا تُستخدم فقط إلى أن تحفظي أول تعديل من اللوحة.
+ * ما زال يُعدَّل من هنا: site.url (عند شراء نطاق)، الأعمار، مدة حفظ الصور، أساليب الرسم.
  */
 
 export type Text = { ar: string; en: string };
@@ -66,6 +66,8 @@ export interface Item {
   /** كلفة تصنيعك للقطعة عند بيعها كإضافة (لحساب الربح) */
   cost: number;
   sort: number;
+  /** product photo uploaded from the admin (version number), if any */
+  image?: number;
 }
 
 export interface Box {
@@ -79,11 +81,14 @@ export interface Box {
   popular?: boolean;
   status: 'available' | 'hidden';
   sort: number;
+  image?: number;
 }
 
 export interface Catalog {
   items: Record<ItemId, Item>;
   boxes: Box[];
+  /** shipping per governorate (live values from the admin settings) */
+  governorates?: Governorate[];
 }
 
 export const defaultItems: Record<ItemId, Item> = {
@@ -245,6 +250,8 @@ export interface StoryValue {
   name: Text;
   desc: Text;
   icon: string;
+  /** removed from the order form; kept so old orders still show its name */
+  deleted?: boolean;
 }
 
 export const storyValues: StoryValue[] = [

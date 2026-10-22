@@ -2,7 +2,9 @@
 import Admin from '../../layouts/Admin.astro';
 import { sameOrigin } from '../../lib/auth';
 import { loadCatalog, saveProduct, deleteProduct } from '../../lib/catalog';
-import { money } from '../../lib/pricing';
+import { money, productImage } from '../../lib/pricing';
+import { env } from '../../lib/db';
+import { sanitizeImage } from '../../lib/image';
 import type { Box, Item } from '../../config/catalog';
 
 export const prerender = false;
@@ -28,6 +30,25 @@ if (Astro.request.method === 'POST') {
     return Math.round(v * 100) / 100;
   };
   const action = g('action');
+  /** New photo (if one was picked), "remove" checkbox, or keep the current one. Returns the image version to store. */
+  const handleImage = async (kind: 'item' | 'box', id: string, current?: number): Promise<number | undefined> => {
+    const file = f.get('image');
+    const hasFile = typeof file === 'object' && file !== null && 'arrayBuffer' in file && (file as File).size > 0;
+    if (hasFile) {
+      if ((file as File).size > 3 * 1024 * 1024) throw new Error('الصورة أكبر من 3 ميغابايت.');
+      const clean = sanitizeImage(await (file as File).arrayBuffer());
+      if (!clean) throw new Error('الملف ليس صورة سليمة (JPG أو PNG أو WebP).');
+      const v = Math.floor(Date.now() / 1000);
+      await env.PHOTOS.put(`pimg:${kind}:${id}:${v}`, clean.buf, { metadata: { type: clean.type } });
+      if (current) await env.PHOTOS.delete(`pimg:${kind}:${id}:${current}`);
+      return v;
+    }
+    if (f.get('remove_image') === 'on') {
+      if (current) await env.PHOTOS.delete(`pimg:${kind}:${id}:${current}`);
+      return undefined;
+    }
+    return current;
+  };
   try {
     const cat = await loadCatalog({ includeDeleted: true });
     if (action === 'save_item' || action === 'new_item') {
@@ -49,6 +70,7 @@ if (Astro.request.method === 'POST') {
         personalized: f.get('personalized') === 'on',
         sort: Math.floor(num('sort')!),
       };
+      item.image = await handleImage('item', id, cat.items[id]?.image);
       await saveProduct('item', item);
     } else if (action === 'save_box' || action === 'new_box') {
       if (!g('name_ar')) throw new Error('اسم الصندوق بالعربية مطلوب.');
@@ -70,11 +92,15 @@ if (Astro.request.method === 'POST') {
         status: g('status') === 'hidden' ? 'hidden' : 'available',
         sort: Math.floor(num('sort')!),
       };
+      box.image = await handleImage('box', id, cat.boxes.find((b) => b.id === id)?.image);
       await saveProduct('box', box);
     } else if (action === 'delete_item' || action === 'delete_box') {
       const id = g('id');
       if (action === 'delete_item' && PROTECTED.has(id)) throw new Error('لا يمكن حذف القصة لأنها أساس كل صندوق.');
-      await deleteProduct(action === 'delete_item' ? 'item' : 'box', id);
+      const kind = action === 'delete_item' ? 'item' : 'box';
+      const img = kind === 'item' ? cat.items[id]?.image : cat.boxes.find((b) => b.id === id)?.image;
+      if (img) await env.PHOTOS.delete(`pimg:${kind}:${id}:${img}`);
+      await deleteProduct(kind, id);
     } else throw new Error('إجراء غير معروف');
     return Astro.redirect('/admin/products?ok=' + encodeURIComponent('تم الحفظ ✓'), 303);
   } catch (e) {
@@ -91,18 +117,19 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
   <h1>المنتجات والصناديق</h1>
   {flash && <p class="flash">{flash}</p>}
   {error && <p class="flash bad" role="alert">{error}</p>}
-  <p class="muted">التغييرات تظهر في الموقع فوراً. الطلبات القديمة تبقى بأسعارها وتكاليفها كما كانت لحظة الطلب. «التكلفة» هي ما يكلّفك تجهيزه، وتُستخدم لحساب الربح ولا تظهر للعملاء.</p>
+  <p class="muted">الصور: يفضّل صورة مربعة أو أفقية واضحة، تُصغَّر تلقائياً قبل الرفع. التغييرات تظهر في الموقع فوراً. الطلبات القديمة تبقى بأسعارها وتكاليفها كما كانت لحظة الطلب. «التكلفة» هي ما يكلّفك تجهيزه، وتُستخدم لحساب الربح ولا تظهر للعملاء.</p>
 
   <h2 class="sec">الصناديق</h2>
   {boxes.map((b) => (
     <details class="apanel prod">
       <summary>
+        {productImage('box', b) ? <img class="thumb" src={productImage('box', b)!} alt="" /> : <span class="thumb none" aria-hidden="true"></span>}
         <strong>{b.name.ar}</strong>
         <span class="muted">{money(b.price)} · تكلفة {money(b.cost ?? 0)} · ربح {money(b.price - (b.cost ?? 0))}</span>
         {b.status === 'hidden' && <span class="st st-cancelled">مخفي</span>}
         {b.popular && <span class="st">الأكثر اختياراً</span>}
       </summary>
-      <form method="post" class="pform">
+      <form method="post" class="pform" enctype="multipart/form-data">
         <input type="hidden" name="action" value="save_box" /><input type="hidden" name="id" value={b.id} />
         <label>الاسم (عربي)<input name="name_ar" value={b.name.ar} required /></label>
         <label>الاسم (إنجليزي)<input name="name_en" value={b.name.en} dir="ltr" /></label>
@@ -116,6 +143,11 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
           {items.map((it) => <label class="cb"><input type="checkbox" name="includes" value={it.id} checked={b.includes.includes(it.id)} disabled={it.id === 'story'} />{it.name.ar}{it.status !== 'available' && ` (${statusLabel[it.status]})`}</label>)}
         </fieldset>
         <label class="cb wide"><input type="checkbox" name="popular" checked={!!b.popular} />شارة «الأكثر اختياراً»</label>
+        <div class="wide imgf">
+          {productImage('box', b) && <img src={productImage('box', b)!} alt="" class="cur" />}
+          <label>{b.image ? 'تغيير الصورة' : 'إضافة صورة'}<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/heic" data-shrink /></label>
+          {b.image && <label class="cb"><input type="checkbox" name="remove_image" />حذف الصورة</label>}
+        </div>
         <div class="acts wide"><button class="abtn primary" type="submit">حفظ</button></div>
       </form>
       <form method="post" class="del" onsubmit="return confirm('حذف هذا الصندوق من الموقع؟ الطلبات القديمة لن تتأثر.')">
@@ -126,7 +158,7 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
   ))}
   <details class="apanel prod new">
     <summary><strong>+ إضافة صندوق جديد</strong></summary>
-    <form method="post" class="pform">
+    <form method="post" class="pform" enctype="multipart/form-data">
       <input type="hidden" name="action" value="new_box" />
       <label>الاسم (عربي)<input name="name_ar" required /></label>
       <label>الاسم (إنجليزي)<input name="name_en" dir="ltr" /></label>
@@ -140,6 +172,7 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
         {items.map((it) => <label class="cb"><input type="checkbox" name="includes" value={it.id} checked={it.id === 'story'} disabled={it.id === 'story'} />{it.name.ar}</label>)}
       </fieldset>
       <label class="cb wide"><input type="checkbox" name="popular" />شارة «الأكثر اختياراً»</label>
+      <div class="wide imgf"><label>صورة (اختياري)<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/heic" data-shrink /></label></div>
       <div class="acts wide"><button class="abtn primary" type="submit">إضافة الصندوق</button></div>
     </form>
   </details>
@@ -148,12 +181,13 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
   {items.map((it) => (
     <details class="apanel prod">
       <summary>
+        {productImage('item', it) ? <img class="thumb" src={productImage('item', it)!} alt="" /> : <span class="thumb none" aria-hidden="true"></span>}
         <strong>{it.name.ar}</strong>
         <span class="muted">{it.addonPrice === null ? 'داخل الصناديق فقط' : `${money(it.addonPrice)} كإضافة`} · تكلفة {money(it.cost ?? 0)}</span>
         {it.status !== 'available' && <span class="st st-cancelled">{statusLabel[it.status]}</span>}
         {it.standalone && <span class="st">يُباع منفرداً</span>}
       </summary>
-      <form method="post" class="pform">
+      <form method="post" class="pform" enctype="multipart/form-data">
         <input type="hidden" name="action" value="save_item" /><input type="hidden" name="id" value={it.id} />
         <label>الاسم (عربي)<input name="name_ar" value={it.name.ar} required /></label>
         <label>الاسم (إنجليزي)<input name="name_en" value={it.name.en} dir="ltr" /></label>
@@ -165,6 +199,11 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
         <label>الحالة<select name="status">{(['available', 'soon', 'hidden'] as const).map((s) => <option value={s} selected={it.status === s}>{statusLabel[s]}</option>)}</select></label>
         <label class="cb"><input type="checkbox" name="standalone" checked={it.standalone} />يُباع منفرداً لأي أحد (بدون قصة)</label>
         <label class="cb"><input type="checkbox" name="personalized" checked={it.personalized} />مخصّص (يحتاج بيانات الطفل)</label>
+        <div class="wide imgf">
+          {productImage('item', it) && <img src={productImage('item', it)!} alt="" class="cur" />}
+          <label>{it.image ? 'تغيير الصورة' : 'إضافة صورة'}<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/heic" data-shrink /></label>
+          {it.image && <label class="cb"><input type="checkbox" name="remove_image" />حذف الصورة</label>}
+        </div>
         <div class="acts wide"><button class="abtn primary" type="submit">حفظ</button></div>
       </form>
       {it.id !== 'story' && (
@@ -177,7 +216,7 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
   ))}
   <details class="apanel prod new">
     <summary><strong>+ إضافة منتج جديد</strong></summary>
-    <form method="post" class="pform">
+    <form method="post" class="pform" enctype="multipart/form-data">
       <input type="hidden" name="action" value="new_item" />
       <label>الاسم (عربي)<input name="name_ar" required /></label>
       <label>الاسم (إنجليزي)<input name="name_en" dir="ltr" /></label>
@@ -189,11 +228,48 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
       <label>الحالة<select name="status"><option value="available">متاح</option><option value="soon">قريباً</option><option value="hidden">مخفي</option></select></label>
       <label class="cb"><input type="checkbox" name="standalone" />يُباع منفرداً لأي أحد (بدون قصة)</label>
       <label class="cb"><input type="checkbox" name="personalized" />مخصّص (يحتاج بيانات الطفل)</label>
+      <div class="wide imgf"><label>صورة (اختياري)<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/heic" data-shrink /></label></div>
       <div class="acts wide"><button class="abtn primary" type="submit">إضافة المنتج</button></div>
     </form>
     <p class="muted small">بعد الإضافة، اختاري الصناديق التي يدخل فيها من قسم «الصناديق».</p>
   </details>
 </Admin>
+<script>
+  // Shrink photos in the browser before upload: faster on slow connections and well under the 3 MB limit.
+  async function shrink(file: File): Promise<File> {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+    const scale = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob: Blob = await new Promise((r, j) => c.toBlob((b) => (b ? r(b) : j(new Error('blob'))), 'image/jpeg', 0.85));
+    return new File([blob], 'product.jpg', { type: 'image/jpeg' });
+  }
+  document.querySelectorAll<HTMLInputElement>('input[data-shrink]').forEach((inp) =>
+    inp.addEventListener('change', async () => {
+      const f = inp.files?.[0];
+      if (!f) return;
+      const form = inp.form!;
+      const btn = form.querySelector<HTMLButtonElement>('button[type=submit]');
+      if (btn) btn.disabled = true;
+      try {
+        const small = await shrink(f);
+        const dt = new DataTransfer();
+        dt.items.add(small);
+        inp.files = dt.files;
+        let prev = inp.closest('.imgf')!.querySelector<HTMLImageElement>('img.preview');
+        if (!prev) { prev = document.createElement('img'); prev.className = 'preview cur'; inp.closest('.imgf')!.prepend(prev); }
+        prev.src = URL.createObjectURL(small);
+        inp.closest('.imgf')!.querySelectorAll<HTMLImageElement>('img.cur:not(.preview)').forEach((i) => (i.hidden = true));
+      } catch {
+        alert('تعذّر قراءة الصورة. جرّبي صورة JPG أو PNG.');
+        inp.value = '';
+      } finally { if (btn) btn.disabled = false; }
+    }),
+  );
+</script>
 <style>
   .sec { font-family: var(--font-body); font-size: 1.15rem; font-weight: 800; margin: 1.5rem 0 0.75rem; }
   .prod { padding: 0; overflow: hidden; }
@@ -213,5 +289,10 @@ const statusLabel = { available: 'متاح', soon: 'قريباً', hidden: 'مخ
   .acts { display: flex; gap: 0.5rem; }
   .del { padding: 0 1.25rem 1.25rem; }
   .small { font-size: 0.85rem; padding: 0 1.25rem 1rem; }
+  .thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--color-rose-soft); flex: none; }
+  .thumb.none { display: inline-block; border: 1.5px dashed var(--color-border); background: transparent; }
+  .imgf { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center; border: 1px dashed var(--color-border); border-radius: 12px; padding: 0.75rem; }
+  .imgf .cur { width: 96px; height: 96px; object-fit: cover; border-radius: 12px; }
+  .imgf input[type='file'] { padding: 0.4rem !important; }
   @media (max-width: 640px) { .pform { grid-template-columns: 1fr; } }
 </style>

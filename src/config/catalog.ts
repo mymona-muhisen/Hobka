@@ -13,7 +13,7 @@ export type Lang = 'ar' | 'en';
 /** عنوان الموقع الأساسي (غيّريه عند شراء دومين) ورمز التحقق من Google Search Console إن وُجد */
 export const site = {
   url: 'https://hobka.mhmymona.workers.dev',
-  googleVerification: '',
+  googleVerification: 'mG5Z__ik7wCvkAYFUuAVNSN5AlauIX_cPjeuVoQX_RI',
 };
 
 export const contact = {

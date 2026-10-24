@@ -72,14 +72,14 @@ export const POST: APIRoute = async ({ request }) => {
   const res = await d
     .prepare(
       `INSERT INTO orders (code, token, created_at, updated_at, status, site_lang, kind, box, addons, child, photo_mode, photo_count, photo_consent,
-        parent_name, phone, governorate, address, notes, discount_code, subtotal, shipping, discount, total, lines, cost_total)
-       VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        parent_name, phone, governorate, address, notes, discount_code, subtotal, shipping, discount, total, lines, cost_total, source)
+       VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       code, token, t, t, o.siteLang, o.kind, isBox ? o.box : null, JSON.stringify(price.lines.filter((l) => l.id.startsWith('addon:')).map((l) => l.id.slice(6))),
       child ? JSON.stringify(child) : null, isBox ? o.photoMode : 'none', photos.length, o.photoConsent ? 1 : 0,
       o.parent.name, o.parent.phone, o.parent.governorate, o.parent.address, o.parent.notes || null, discount?.code ?? null,
-      price.subtotal, price.shipping, price.discount, price.total, JSON.stringify(lines), price.cost,
+      price.subtotal, price.shipping, price.discount, price.total, JSON.stringify(lines), price.cost, o.source || null,
     )
     .run();
   const orderId = Number(res.meta?.last_row_id ?? 0);

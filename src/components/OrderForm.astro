@@ -26,6 +26,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   <header class="order-head">
     <h1>{t.title}</h1>
     <p class="muted">{t.intro}</p>
+    <p class="timeline"><Icon name="truck" />{t.timeline}</p>
   </header>
 
   <div class="layout" id="order-layout">
@@ -152,6 +153,10 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
             <p class="field-error" data-error="ownIdea" hidden></p>
           </div>
         </div>
+        <div class="field">
+          <label for="s-ded">{t.dedication} <span class="muted">{t.optional}</span></label>
+          <textarea id="s-ded" name="dedication" rows="2" maxlength="200" placeholder={t.dedicationHint}></textarea>
+        </div>
         {stylesEnabled && (
           <fieldset class="field">
             <legend>{t.styleLabel}</legend>
@@ -250,6 +255,13 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
         <div class="field">
           <label for="d-notes">{t.notes} <span class="muted">{t.optional}</span></label>
           <textarea id="d-notes" name="notes" rows="2" maxlength="600"></textarea>
+        </div>
+        <div class="field">
+          <label for="d-src">{t.source} <span class="muted">{t.optional}</span></label>
+          <select id="d-src" name="source">
+            <option value="">{t.choose}</option>
+            {Object.entries(t.sourceOptions).map(([k, v]) => <option value={k}>{v}</option>)}
+          </select>
         </div>
         <div class="field">
           <label for="d-code">{t.discount} <span class="muted">{t.optional}</span></label>
@@ -588,6 +600,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       } else {
         rows.push([str('idea'), val('ownIdea'), 'story']);
       }
+      if (val('dedication')) rows.push([str('dedicationShort'), val('dedication'), 'story']);
       const pm = radio('photoMode');
       rows.push([str('photo'), pm === 'upload' ? `${str('photoUpload')} (${photos.length})` : pm === 'whatsapp' ? str('photoWhatsapp') : str('photoNone'), 'photo']);
     }
@@ -621,12 +634,13 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       child: b === 'only' ? null : {
         name: val('childName'), gender: radio('gender'), age: Number(val('age')), storyLang: radio('storyLang') || L,
         ...(radio('storyMode') === 'ready' ? { values: checked('values'), valueNote: val('valueNote'), ownIdea: '' } : { values: [], valueNote: '', ownIdea: val('ownIdea') }),
-        appearance: val('appearance'), interests: val('interests'), ...(radio('style') ? { style: radio('style') } : {}),
+        appearance: val('appearance'), interests: val('interests'), dedication: val('dedication'), ...(radio('style') ? { style: radio('style') } : {}),
       },
       photoMode: b === 'only' ? 'none' : radio('photoMode'),
       photoConsent: ($('#p-consent') as HTMLInputElement).checked,
       parent: { name: val('parentName'), phone: val('phone'), governorate: val('governorate'), address: val('address'), notes: val('notes') },
       discountCode: discount ? discount.code : '',
+      source: val('source'),
       privacyAccepted: true,
       website: val('website'),
     };
@@ -668,6 +682,8 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
 <style>
   .order { padding-block: var(--space-8) var(--space-16); }
   .order-head { max-width: 720px; margin-bottom: var(--space-8); }
+  .timeline { display: flex; gap: var(--space-2); align-items: center; margin: var(--space-3) 0 0; color: var(--color-brand-dark); font-weight: 500; font-size: 0.97rem; }
+  .timeline :global(svg) { width: 20px; height: 20px; flex: none; color: var(--color-brand); }
   .order-head h1 { font-size: clamp(1.9rem, 3.6vw, 2.8rem); margin-bottom: var(--space-2); }
   .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-8); align-items: start; }
   form { background: var(--color-white); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); padding: clamp(1.25rem, 3vw, 2.5rem); scroll-margin-top: 90px; }

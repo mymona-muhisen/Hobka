@@ -15,6 +15,7 @@ export const childSchema = z.object({
   ownIdea: trim(800).default(''),
   appearance: trim(400).default(''),
   interests: trim(300).default(''),
+  dedication: trim(200).default(''),
   style: z.enum(artStyles.map((s) => s.id) as [string, ...string[]]).optional(),
 });
 
@@ -35,6 +36,7 @@ export const orderSchema = z
       notes: trim(600).default(''),
     }),
     discountCode: trim(30).default(''),
+    source: z.enum(['', 'instagram', 'facebook', 'whatsapp', 'friend', 'search', 'other']).default(''),
     privacyAccepted: z.literal(true),
     /** honeypot: real people leave it empty */
     website: z.string().max(0).optional(),

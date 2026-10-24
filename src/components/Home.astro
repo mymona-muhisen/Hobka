@@ -4,14 +4,24 @@ import heart from '../assets/heart.svg?raw';
 import { ui, path, fill } from '../i18n/ui';
 import { contact, photoRetentionDays, type Lang, type Catalog } from '../config/catalog';
 import { money, activeBoxes, productImage } from '../lib/pricing';
-import { getSettings } from '../lib/settings';
+import { getSettings, activeValues } from '../lib/settings';
 
 interface Props { lang: Lang; catalog: Catalog }
 const { lang, catalog } = Astro.props;
 const items = catalog.items;
 const boxes = activeBoxes(catalog);
 const t = ui[lang];
-const { timing, pricesAreFinal } = await getSettings(Astro.locals);
+const settings = await getSettings(Astro.locals);
+const { timing, pricesAreFinal } = settings;
+// A short line of story values, situational ones first (they are what makes parents say "this is what we need now").
+const allValues = activeValues(settings);
+const PREFER = ['sleep', 'sibling', 'screens', 'courage', 'confidence', 'patience', 'friendship', 'prayer'];
+const shownValues = [...PREFER.map((id) => allValues.find((v) => v.id === id)).filter((v) => !!v), ...allValues.filter((v) => !PREFER.includes(v.id))].slice(0, 8);
+const moreValues = allValues.length - shownValues.length;
+const arCount = (n: number) => (n === 1 ? 'وقيمة أخرى' : n === 2 ? 'وقيمتان أخريان' : n <= 10 ? `و${n} قيم أخرى` : `و${n} قيمة أخرى`);
+const moreText = moreValues > 0
+  ? (lang === 'ar' ? `${arCount(moreValues)}، أو فكرتك الخاصة` : fill(t.boxes.valuesMore, { n: moreValues }))
+  : (lang === 'ar' ? 'أو فكرتك الخاصة' : 'or your own idea');
 const vars = { draft: timing.draftDays[lang], print: timing.printDays[lang], days: photoRetentionDays };
 const orderHref = path(lang, '/order');
 const standalone = Object.values(items).filter((i) => i.standalone && i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
@@ -79,6 +89,12 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
       ))}
     </div>
     {!pricesAreFinal && <p class="price-note muted">{t.boxes.priceNote}</p>}
+    <p class="timeline"><Icon name="truck" />{t.boxes.timeline}</p>
+    <div class="values-line">
+      <span class="vl-lead">{t.boxes.valuesLead}</span>
+      {shownValues.map((v) => <span class="vchip"><Icon name={v.icon} />{v.name[lang]}</span>)}
+      <a href={orderHref} class="vl-more">{moreText}</a>
+    </div>
 
     <div class="standalone">
       <img src="/images/seedling.webp" width="900" height="411" alt="" loading="lazy" class="st-img" />
@@ -221,6 +237,13 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   .box li.soon { color: var(--color-muted); }
   .box li .badge { margin-inline-start: var(--space-2); font-size: 0.75rem; }
   .price-note { text-align: center; margin-top: var(--space-4); font-size: 0.95rem; }
+  .timeline { display: flex; justify-content: center; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; color: var(--color-brand-dark); font-weight: 500; text-align: center; }
+  .timeline :global(svg) { width: 20px; height: 20px; flex: none; color: var(--color-brand); }
+  .values-line { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2); margin: var(--space-8) auto 0; max-width: 900px; }
+  .vl-lead { font-weight: 700; color: var(--color-brand-dark); margin-inline-end: var(--space-1); }
+  .vchip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-white); border: 1px solid var(--color-border); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.95rem; }
+  .vchip :global(svg) { width: 16px; height: 16px; color: var(--color-brand); }
+  .vl-more { font-weight: 700; color: var(--color-brand); }
   .standalone { margin-top: var(--space-12); display: grid; grid-template-columns: 200px 1.2fr 1.2fr auto; gap: var(--space-6); align-items: center; background: var(--color-sage); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-8); }
   .st-img { width: 200px; height: 120px; object-fit: cover; border-radius: var(--radius-md); }
   .standalone h3 { margin-bottom: var(--space-1); }

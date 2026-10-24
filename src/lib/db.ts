@@ -100,6 +100,7 @@ const ORDER_COLUMNS: [string, string][] = [
   ['lines', 'TEXT'],
   ['cost_total', 'REAL NOT NULL DEFAULT 0'],
   ['extra_cost', 'REAL NOT NULL DEFAULT 0'],
+  ['source', 'TEXT'],
 ];
 
 async function migrate() {
@@ -148,5 +149,5 @@ export interface OrderRow {
   parent_name: string; phone: string; governorate: string; address: string; notes: string | null;
   discount_code: string | null; subtotal: number; shipping: number; discount: number; total: number;
   draft_url: string | null; draft_message: string | null; draft_version: number; feedback: string | null; approved_at: string | null; admin_notes: string | null;
-  lines: string | null; cost_total: number; extra_cost: number;
+  lines: string | null; cost_total: number; extra_cost: number; source: string | null;
 }

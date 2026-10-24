@@ -3,6 +3,7 @@ import Admin from '../../layouts/Admin.astro';
 import { db, type OrderRow } from '../../lib/db';
 import { statuses, type Status } from '../../lib/order';
 import { getSettings } from '../../lib/settings';
+import { orderUi } from '../../i18n/order';
 import { money } from '../../lib/pricing';
 import { loadCatalog } from '../../lib/catalog';
 import { orderLines, profit, PAID } from '../../lib/orderLines';
@@ -38,6 +39,9 @@ const allPaid = (await d.prepare(`${sumSql} WHERE status IN (${paidIn})`).bind(.
 const pending = (await d.prepare(`${sumSql} WHERE status NOT IN (${paidIn}, 'cancelled')`).bind(...PAID).first<Sum>())!;
 const openCount = counts.filter((c) => !['delivered', 'cancelled'].includes(c.status)).reduce((s, c) => s + c.n, 0);
 const fmtDate = (iso: string) => new Date(iso).toLocaleString('ar-SY', { timeZone: 'Asia/Damascus', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+// Where orders come from ("How did you hear about Hobka?")
+const { results: sources } = await d.prepare(`SELECT COALESCE(source, '') AS source, COUNT(*) AS n, SUM(CASE WHEN status IN (${paidIn}) THEN 1 ELSE 0 END) AS paid FROM orders WHERE status != 'cancelled' GROUP BY 1 ORDER BY n DESC`).bind(...PAID).all<{ source: string; n: number; paid: number }>();
+const srcLabel = (k: string) => (k ? (orderUi.ar.sourceOptions as Record<string, string>)[k] ?? k : 'لم يُذكر');
 const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: string }).name : '—');
 ---
 <Admin title="الطلبات">
@@ -48,6 +52,9 @@ const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: st
     <div class="apanel stat"><span class="muted">الربح الكلي (مدفوعة)</span><strong>{money(allPaid.prof)}</strong><span class="muted small">{allPaid.n} طلب · مبيعات {money(allPaid.rev)}</span></div>
     <div class="apanel stat"><span class="muted">ربح متوقع (لم تُدفع بعد)</span><strong>{money(pending.prof)}</strong><span class="muted small">{pending.n} طلب</span></div>
   </div>
+  {sources.some((s) => s.source) && (
+    <p class="sources"><strong>عرفونا من:</strong> {sources.map((s) => <span>{srcLabel(s.source)} {s.n}{s.paid ? ` (${s.paid} مدفوع)` : ''}</span>)}</p>
+  )}
   <form class="filters" method="get">
     <select name="status" aria-label="الحالة" onchange="this.form.submit()">
       <option value="open" selected={status === 'open'}>المفتوحة ({openCount})</option>
@@ -88,6 +95,8 @@ const childName = (o: OrderRow) => (o.child ? (JSON.parse(o.child) as { name: st
   .stat { display: grid; gap: 0.15rem; margin-bottom: 0.5rem; }
   .stat strong { font-family: var(--font-display); font-size: 1.6rem; color: var(--color-brand-dark); }
   .small { font-size: 0.82rem; }
+  .sources { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.92rem; margin: 0 0 1rem; }
+  .sources span { background: #fff; border-radius: 99px; padding: 0.15rem 0.7rem; }
   .pf { display: inline !important; color: var(--color-success); }
   .pf.neg { color: var(--color-error); }
   @media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }

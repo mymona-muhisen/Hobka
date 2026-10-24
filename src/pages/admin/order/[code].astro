@@ -6,6 +6,7 @@ import { sameOrigin } from '../../../lib/auth';
 import { statuses, waLink, toIntl, type Status, type ChildInput } from '../../../lib/order';
 import { artStyles, photoRetentionDays } from '../../../config/catalog';
 import { getSettings } from '../../../lib/settings';
+import { orderUi } from '../../../i18n/order';
 import { loadCatalog } from '../../../lib/catalog';
 import { orderLines, revenue, profit } from '../../../lib/orderLines';
 import { money } from '../../../lib/pricing';
@@ -163,6 +164,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
             {child.ownIdea && <><dt>فكرة الأهل</dt><dd class="pre">{child.ownIdea}</dd></>}
             {child.appearance && <><dt>الشكل</dt><dd class="pre">{child.appearance}</dd></>}
             {child.interests && <><dt>يحب</dt><dd>{child.interests}</dd></>}
+            {child.dedication && <><dt>الإهداء</dt><dd class="pre"><strong>{child.dedication}</strong></dd></>}
             {child.style && <><dt>الأسلوب</dt><dd>{artStyles.find((s) => s.id === child.style)?.name.ar}</dd></>}
           </dl>
         </section>
@@ -277,6 +279,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
           <dt>المحافظة</dt><dd>{gov?.name.ar}</dd>
           <dt>العنوان</dt><dd class="pre">{o.address}</dd>
           {o.notes && <><dt>ملاحظات</dt><dd class="pre">{o.notes}</dd></>}
+          {o.source && <><dt>عرفنا من</dt><dd>{orderUi.ar.sourceOptions[o.source as keyof typeof orderUi.ar.sourceOptions] ?? o.source}</dd></>}
         </dl>
         <details class="edit">
           <summary>تعديل بيانات التوصيل</summary>

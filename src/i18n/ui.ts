@@ -8,7 +8,7 @@ export const ui = {
     nav: { home: 'الرئيسية', boxes: 'الصناديق', how: 'كيف تعمل؟', habbouk: 'حبّوك', faq: 'الأسئلة', order: 'اطلب قصة لطفلك', menu: 'القائمة', close: 'إغلاق' },
     meta: {
       homeTitle: 'حبكة | قصص أطفال مخصّصة بطلها طفلك، هدية مطبوعة في سوريا',
-      homeDesc: 'اطلب قصة أطفال مطبوعة بطلها طفلك، باسمه وشكله وقيمة تختارها، مع ستيكرات ورسالة سرية من حبّوك. هدية مميزة للأطفال من 2 إلى 12 سنة، توصيل في دمشق وريفها وشحن لكل المحافظات السورية.',
+      homeDesc: 'اطلب قصة أطفال مطبوعة بطلها طفلك، باسمه وشكله وقيمة تختارها، مع ستيكرات بشكله الكرتوني وصورة مع حبّوك بالكاميرا. هدية مميزة للأطفال من 2 إلى 12 سنة، توصيل في دمشق وريفها وشحن لكل المحافظات السورية.',
     },
     hero: {
       eyebrow: 'حكاية تُصنع لطفلك',
@@ -69,7 +69,7 @@ export const ui = {
     nav: { home: 'Home', boxes: 'Boxes', how: 'How it works', habbouk: 'Habbouk', faq: 'FAQ', order: 'Order a story', menu: 'Menu', close: 'Close' },
     meta: {
       homeTitle: 'Hobka | Personalized children’s books starring your child, Syria',
-      homeDesc: 'Order a printed personalized storybook starring your child, with their name, look and a value you choose, plus stickers and a secret letter from Habbouk. A unique gift for ages 2–12, delivered across Syria.',
+      homeDesc: 'Order a printed personalized storybook starring your child, with their name, look and a value you choose, plus stickers of their cartoon self and a photo with Habbouk through the camera. A unique gift for ages 2–12, delivered across Syria.',
     },
     hero: {
       eyebrow: 'A story made for your child',

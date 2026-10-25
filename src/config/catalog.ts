@@ -121,7 +121,7 @@ export const defaultItems: Record<ItemId, Item> = {
     name: { ar: 'رسالة حبّوك السرية', en: 'Habbouk’s secret letter' },
     desc: { ar: 'مغلّف مختوم فيه رسالة من حبّوك باسم طفلك، يمنحه فيها درع الشجاعة وتاج البطولة.', en: 'A sealed envelope with a letter from Habbouk to your child by name, awarding the shield of courage and the crown of heroes.' },
     personalized: true,
-    status: 'available',
+    status: 'hidden', // removed from the boxes (Oct 2026)
     addonPrice: null,
     standalone: false,
   },
@@ -187,9 +187,9 @@ export const defaultBoxes: Box[] = [
     id: 'story',
     name: { ar: 'صندوق القصة', en: 'Story box' },
     tagline: { ar: 'البداية: قصة طفلك وستيكراته', en: "The start: your child's story and stickers" },
-    price: 25, // PLACEHOLDER
+    price: 10, // story + stickers, kept at $10 or less
     cost: 0, // PLACEHOLDER
-    includes: ['story', 'stickers', 'letter'],
+    includes: ['story', 'stickers'],
     status: 'available',
     sort: 1,
   },
@@ -199,7 +199,7 @@ export const defaultBoxes: Box[] = [
     tagline: { ar: 'الأكثر اختياراً: قصة ونشاطات تكمل الحكاية', en: 'Most chosen: the story plus activities that continue it' },
     price: 35, // PLACEHOLDER
     cost: 0, // PLACEHOLDER
-    includes: ['story', 'stickers', 'letter', 'cards', 'planting'],
+    includes: ['story', 'stickers', 'cards', 'planting'],
     popular: true,
     status: 'available',
     sort: 2,
@@ -210,7 +210,7 @@ export const defaultBoxes: Box[] = [
     tagline: { ar: 'كل شيء، مع بازل بصورة طفلك', en: 'Everything, plus a puzzle with your child’s picture' },
     price: 45, // PLACEHOLDER
     cost: 0, // PLACEHOLDER
-    includes: ['story', 'stickers', 'letter', 'cards', 'planting', 'puzzle', 'figure3d', 'newspaper'],
+    includes: ['story', 'stickers', 'cards', 'planting', 'puzzle', 'figure3d', 'newspaper'],
     status: 'available',
     sort: 3,
   },

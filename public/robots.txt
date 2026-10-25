@@ -4,4 +4,4 @@ Disallow: /admin
 Disallow: /d/
 Disallow: /api/
 
-Sitemap: https://hobka.mhmymona.workers.dev/sitemap.xml
+Sitemap: https://stories.hobka.workers.dev/sitemap.xml

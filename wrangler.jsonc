@@ -1,11 +1,11 @@
 {
   // Cloudflare Worker for the Hobka order site.
-  // D1 (orders) and KV (children's photos, auto-deleted after 60 days) are created
-  // automatically on the first deploy because they have no ids here.
-  "name": "hobka",
+  // Site address: https://stories.hobka.workers.dev (worker "stories" on the "hobka" account subdomain).
+  // D1 (orders) and KV (children's and product photos) are pinned by id so renames never lose data.
+  "name": "stories",
   "compatibility_date": "2026-10-01",
   "main": "@astrojs/cloudflare/entrypoints/server",
-  "d1_databases": [{ "binding": "DB", "database_name": "hobka-orders" }],
-  "kv_namespaces": [{ "binding": "PHOTOS" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "hobka-orders", "database_id": "0cf59169-05ae-46c7-a5c5-5edc0d23b351" }],
+  "kv_namespaces": [{ "binding": "PHOTOS", "id": "4f69d6f9b57e497fa9026cb5a96d250f" }],
   "observability": { "enabled": true }
 }

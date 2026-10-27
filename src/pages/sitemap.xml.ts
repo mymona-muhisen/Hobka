@@ -8,7 +8,6 @@ const PAGES: [string, string | null][] = [
   ['/', '/en'],
   ['/order', '/en/order'],
   ['/habbouk', '/en/habbouk'],
-  ['/ar/', null],
   ['/privacy', '/en/privacy'],
   ['/terms', '/en/terms'],
 ];

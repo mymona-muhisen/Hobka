@@ -162,8 +162,8 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
       <h2>{t.habbouk.title}</h2>
       <p class="lead">{t.habbouk.text}</p>
       <div class="actions">
-        <a class="btn btn-primary" href={contact.arUrl}><Icon name="camera" />{t.habbouk.cta}</a>
-        <a class="btn btn-secondary" href={path(lang, '/habbouk')}>{t.habbouk.more}</a>
+        {settings.ar.public && <a class="btn btn-primary" href={contact.arUrl}><Icon name="camera" />{t.habbouk.cta}</a>}
+        <a class:list={['btn', settings.ar.public ? 'btn-secondary' : 'btn-primary']} href={path(lang, '/habbouk')}>{t.habbouk.more}</a>
       </div>
     </div>
   </div>

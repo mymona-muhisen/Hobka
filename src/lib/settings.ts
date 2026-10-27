@@ -13,6 +13,8 @@ export interface Settings {
   maxValues: number;
   governorates: (Governorate & { hidden?: boolean })[];
   values: StoryValue[];
+  /** Habbouk camera experience (/ar/): open to everyone, or only to box owners who scan the box QR (link with ?k=key). */
+  ar: { public: boolean; key: string };
 }
 
 export const defaultSettings: Settings = {
@@ -23,7 +25,11 @@ export const defaultSettings: Settings = {
   maxValues: defMax,
   governorates: defGovs.map((g) => ({ ...g })),
   values: defValues.map((v) => ({ ...v })),
+  ar: { public: false, key: '' },
 };
+
+/** Box key: letters and digits only, so it fits in a short QR link. */
+export const AR_KEY_RE = /^[A-Za-z0-9]{6,32}$/;
 
 const KEY = 'site';
 
@@ -43,6 +49,10 @@ function merge(stored: Partial<Settings> | null): Settings {
     maxValues: Number.isInteger(s.maxValues) && s.maxValues! >= 1 ? s.maxValues! : defaultSettings.maxValues,
     governorates: [...govs, ...missing],
     values: Array.isArray(s.values) ? s.values : defaultSettings.values,
+    ar: {
+      public: typeof s.ar?.public === 'boolean' ? s.ar.public : defaultSettings.ar.public,
+      key: typeof s.ar?.key === 'string' && AR_KEY_RE.test(s.ar.key) ? s.ar.key : '',
+    },
   };
 }
 

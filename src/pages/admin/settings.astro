@@ -2,7 +2,8 @@
 import Admin from '../../layouts/Admin.astro';
 import Icon from '../../components/Icon.astro';
 import { sameOrigin } from '../../lib/auth';
-import { getSettings, saveSettings, type Settings } from '../../lib/settings';
+import { getSettings, saveSettings, AR_KEY_RE, type Settings } from '../../lib/settings';
+import { site } from '../../config/catalog';
 import type { StoryValue } from '../../config/catalog';
 
 export const prerender = false;
@@ -15,6 +16,8 @@ const ICONS: [string, string][] = [
   ['apple', 'تفاحة'], ['sun', 'شمس'], ['sparkle', 'لمعة'], ['camera', 'كاميرا'], ['pencil', 'قلم'], ['check', 'صح'],
 ];
 const iconOk = new Set(ICONS.map(([k]) => k));
+const AB = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const randKey = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => AB[b % AB.length]).join('');
 const randId = () => 'v-' + Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 6);
 
 if (Astro.request.method === 'POST') {
@@ -24,7 +27,15 @@ if (Astro.request.method === 'POST') {
   const action = g('action');
   try {
     const s: Settings = structuredClone(await getSettings());
-    if (action === 'contact') {
+    if (action === 'ar_toggle') {
+      s.ar = { ...s.ar, public: !s.ar.public };
+    } else if (action === 'ar_key') {
+      const k = g('ar_key', 40);
+      if (!AR_KEY_RE.test(k)) throw new Error('مفتاح العلبة: من 6 إلى 32 حرفاً إنجليزياً أو رقماً، بدون مسافات أو رموز.');
+      s.ar = { ...s.ar, key: k };
+    } else if (action === 'ar_newkey') {
+      s.ar = { ...s.ar, key: randKey() };
+    } else if (action === 'contact') {
       const wa = g('whatsapp').replace(/[^0-9]/g, '');
       if (!/^[1-9][0-9]{7,14}$/.test(wa)) throw new Error('رقم الواتساب: بالصيغة الدولية بدون + أو أصفار في البداية، مثل 963968190380.');
       const url = (k: string) => { const v = g(k, 300); if (v && !/^https:\/\/[^\s]+$/.test(v)) throw new Error('الروابط يجب أن تبدأ بـ https://'); return v; };
@@ -68,7 +79,7 @@ if (Astro.request.method === 'POST') {
       if (!s.values.some((x) => !x.deleted)) throw new Error('يجب أن تبقى قيمة واحدة على الأقل.');
     } else throw new Error('إجراء غير معروف');
     await saveSettings(s);
-    return Astro.redirect('/admin/settings?ok=' + encodeURIComponent('تم الحفظ ✓') + (action.includes('value') ? '#values' : action === 'shipping' ? '#shipping' : ''), 303);
+    return Astro.redirect('/admin/settings?ok=' + encodeURIComponent('تم الحفظ ✓') + (action.includes('value') ? '#values' : action === 'shipping' ? '#shipping' : action.startsWith('ar_') ? '#ar' : ''), 303);
   } catch (e) {
     error = (e as Error).message;
   }
@@ -76,12 +87,44 @@ if (Astro.request.method === 'POST') {
 
 const s = await getSettings();
 const values = s.values.filter((v) => !v.deleted);
+const boxLink = s.ar.key ? `${site.url}/ar/?k=${s.ar.key}` : '';
 ---
 <Admin title="الإعدادات">
   <h1>الإعدادات</h1>
   {flash && <p class="flash">{flash}</p>}
   {error && <p class="flash bad" role="alert">{error}</p>}
-  <p class="muted">كل ما هنا يظهر في الموقع فوراً، بدون تعديل ملفات. <a href="#contact">التواصل</a> · <a href="#texts">الدفع والمدد</a> · <a href="#shipping">الشحن</a> · <a href="#values">قيم القصة</a></p>
+  <p class="muted">كل ما هنا يظهر في الموقع فوراً، بدون تعديل ملفات. <a href="#ar">تجربة حبّوك</a> · <a href="#contact">التواصل</a> · <a href="#texts">الدفع والمدد</a> · <a href="#shipping">الشحن</a> · <a href="#values">قيم القصة</a></p>
+
+  <section class="apanel" id="ar">
+    <h2>تجربة حبّوك بالكاميرا (AR)</h2>
+    <div class:list={['arstate', { on: s.ar.public }]}>
+      <p>
+        {s.ar.public
+          ? <><strong>ظاهرة لكل الزوار.</strong> زر «التقط صورة مع حبّوك» يظهر في الموقع، وأي شخص يقدر يفتح الصفحة.</>
+          : <><strong>مخفية عن الزوار.</strong> تفتح فقط لمن يمسح رمز QR على صندوق حبكة (ولكِ أنتِ للمعاينة).</>}
+      </p>
+      <form method="post">
+        <input type="hidden" name="action" value="ar_toggle" />
+        <button class:list={['abtn', { primary: !s.ar.public }]} type="submit">{s.ar.public ? 'إيقاف العرض للجميع' : 'عرض التجربة للجميع'}</button>
+      </form>
+    </div>
+
+    <h3 class="sub">رابط العلبة</h3>
+    <p class="muted small">هذا الرابط هو اللي داخل رمز QR المطبوع على العلبة. مين ما فتحه مرة، بتضل التجربة تفتح عنده من نفس الجوال.</p>
+    {boxLink
+      ? <p class="link"><code dir="ltr">{boxLink}</code> <button class="abtn" type="button" data-copy={boxLink}>نسخ</button></p>
+      : <p class="flash bad">ما في مفتاح محفوظ بعد، فما حدا يقدر يفتح التجربة من العلبة. اكتبي مفتاح العلبة تحت واحفظيه.</p>}
+    <form method="post" class="sform">
+      <input type="hidden" name="action" value="ar_key" />
+      <label>مفتاح العلبة (حروف إنجليزية وأرقام)<input name="ar_key" value={s.ar.key} dir="ltr" required pattern="[A-Za-z0-9]{6,32}" autocomplete="off" spellcheck="false" /></label>
+      <div class="wide acts"><button class="abtn primary" type="submit">حفظ المفتاح</button><a class="abtn" href="/ar/" target="_blank" rel="noopener">معاينة التجربة</a></div>
+    </form>
+    <form method="post" class="newkey" onsubmit="return confirm('مفتاح جديد يعني أن رموز QR المطبوعة على العلب الحالية تتوقف عن العمل. متأكدة؟')">
+      <input type="hidden" name="action" value="ar_newkey" />
+      <button class="abtn danger" type="submit">توليد مفتاح جديد</button>
+      <span class="muted small">فقط إذا انتشر الرابط. بعدها تحتاجين رمز QR جديد للعلب.</span>
+    </form>
+  </section>
 
   <section class="apanel" id="contact">
     <h2>التواصل</h2>
@@ -168,6 +211,11 @@ const values = s.values.filter((v) => !v.deleted);
     </details>
   </section>
 </Admin>
+<script is:inline>
+  document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'تم النسخ ✓'; } catch { b.textContent = 'انسخيه يدوياً'; }
+  }));
+</script>
 <style>
   .small { font-size: 0.88rem; }
   .sform { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; }
@@ -186,6 +234,13 @@ const values = s.values.filter((v) => !v.deleted);
   .val form { padding: 0 1rem 1rem; }
   .vi { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--color-rose-soft); color: var(--color-brand); }
   .vi :global(svg) { width: 18px; height: 18px; }
-  .acts { display: flex; gap: 0.5rem; }
+  .acts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .arstate { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; padding: 0.9rem 1rem; border-radius: 14px; background: var(--color-rose-soft); margin-bottom: 1rem; }
+  .arstate.on { background: #e3f2e9; }
+  .arstate p { margin: 0; flex: 1 1 280px; }
+  .sub { font-size: 1rem; margin: 0.5rem 0 0.25rem; }
+  .link { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .link code { background: var(--color-paper); border: 1px solid var(--color-border); border-radius: 10px; padding: 0.45rem 0.7rem; word-break: break-all; }
+  .newkey { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
   @media (max-width: 640px) { .sform { grid-template-columns: 1fr; } }
 </style>

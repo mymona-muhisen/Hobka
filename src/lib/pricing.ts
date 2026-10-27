@@ -1,4 +1,4 @@
-import { governorates as defaultGovernorates, type BoxId, type Catalog, type ItemId } from '../config/catalog';
+import { shippingOnDelivery, governorates as defaultGovernorates, type BoxId, type Catalog, type ItemId } from '../config/catalog';
 
 export interface Discount {
   code: string;
@@ -59,7 +59,8 @@ export function computePrice(c: Catalog, input: PriceInput, discount?: Discount 
   const subtotal = round(lines.reduce((s, l) => s + l.amount, 0));
   const cost = round(lines.reduce((s, l) => s + l.cost, 0));
   const gov = (c.governorates ?? defaultGovernorates).find((g) => g.id === input.governorate);
-  const shipping = gov ? gov.shipping : 0;
+  // Shipping on delivery: paid to the courier, so it is not part of the order total.
+  const shipping = gov && !shippingOnDelivery ? gov.shipping : 0;
   let off = 0;
   if (discount) {
     off = discount.kind === 'percent' ? (subtotal * Math.min(100, Math.max(0, discount.value))) / 100 : discount.value;

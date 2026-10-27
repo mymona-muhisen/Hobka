@@ -4,7 +4,7 @@ import Icon from '../../../components/Icon.astro';
 import { db, env, now, logEvent, type OrderRow } from '../../../lib/db';
 import { sameOrigin } from '../../../lib/auth';
 import { statuses, waLink, toIntl, type Status, type ChildInput } from '../../../lib/order';
-import { artStyles, photoRetentionDays } from '../../../config/catalog';
+import { artStyles, photoRetentionDays, shippingOnDelivery } from '../../../config/catalog';
 import { getSettings } from '../../../lib/settings';
 import { orderUi } from '../../../i18n/order';
 import { loadCatalog } from '../../../lib/catalog';
@@ -121,13 +121,13 @@ const msgs = lang === 'en'
   ? {
       confirm: `Hello ${o.parent_name} 🌸\nWe received your order ${o.code} ✅\nWe're drawing your child and will send you their look within ${timing.draftDays.en} for your approval.`,
       draft: `Hello ${o.parent_name} 🌸\n${child ? `This is how ${child.name} will look in their story!` : 'Your child’s drawing is ready!'}\nHave a look and approve the likeness, or write your notes (the story stays a surprise 🎁):\n${draftLink}`,
-      pay: `Thank you for approving the look 💛\nOrder ${o.code}\nTotal: ${money(o.total, 'en')}\n${payment.instructions.en}\nWe start printing as soon as payment arrives.`,
+      pay: `Thank you for approving the look 💛\nOrder ${o.code}\nTotal: ${money(o.total, 'en')}${shippingOnDelivery && !o.shipping ? ' (shipping is paid to the courier on delivery)' : ''}\n${payment.instructions.en}\nWe start printing as soon as payment arrives.`,
       shipped: `Good news! Order ${o.code} is on its way to you 📦`,
     }
   : {
       confirm: `مرحباً ${o.parent_name} 🌸\nوصلنا طلبك ${o.code} ✅\nنرسم شخصية طفلك وسنرسل لك شكله خلال ${timing.draftDays.ar} لتوافق عليه.`,
       draft: `مرحباً ${o.parent_name} 🌸\n${child ? `هكذا سيظهر ${child.name} في حكايته!` : 'رسمة طفلك جاهزة!'}\nشاهدها من هنا ووافق على الشبه، أو اكتب ملاحظاتك (الحكاية نفسها تبقى مفاجأة 🎁):\n${draftLink}`,
-      pay: `شكراً لموافقتك على شكل طفلك 💛\nالطلب ${o.code}\nالمبلغ: ${money(o.total, 'ar')}\n${payment.instructions.ar}\nنبدأ الطباعة فور وصول الدفعة.`,
+      pay: `شكراً لموافقتك على شكل طفلك 💛\nالطلب ${o.code}\nالمبلغ: ${money(o.total, 'ar')}${shippingOnDelivery && !o.shipping ? ' (الشحن يُدفع لشركة التوصيل عند الاستلام)' : ''}\n${payment.instructions.ar}\nنبدأ الطباعة فور وصول الدفعة.`,
       shipped: `خبر جميل! طلبك ${o.code} في الطريق إليك 📦`,
     };
 const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', status: 'تغيير الحالة', draft_sent: 'أُرسل شكل الطفل', draft_images: 'رسومات الشخصية', approved: 'وافق الأهل على الشكل', changes_requested: 'طلب الأهل تعديلاً', photos_deleted: 'حُذفت الصور', shipping: 'تعديل كلفة الشحن', delivery_edit: 'تعديل بيانات التوصيل' };
@@ -241,17 +241,21 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
         <h2>الطلب والمبلغ</h2>
         <ul class="lines">
           {lines.map((l) => <li><span>{l.name_ar}</span><span>{money(l.price)}</span></li>)}
-          <li><span>الشحن ({gov?.name.ar})</span><span>{money(o.shipping)}</span></li>
+          {shippingOnDelivery && !o.shipping
+            ? <li><span>الشحن ({gov?.name.ar})</span><span>عند الاستلام</span></li>
+            : <li><span>الشحن ({gov?.name.ar})</span><span>{money(o.shipping)}</span></li>}
           {o.discount > 0 && <li><span>خصم <span class="ltr">{o.discount_code}</span></span><span>−{money(o.discount)}</span></li>}
           <li class="total"><span>المجموع</span><span>{money(o.total)}</span></li>
         </ul>
-        <p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. الشحن تقريبي: عدّليه حسب سعر الشركة قبل إرسال تفاصيل الدفع.</p>
+        {shippingOnDelivery && !o.shipping
+          ? <p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. الشحن غير داخل في المبلغ: يدفعه العميل لشركة التوصيل عند الاستلام.</p>
+          : <><p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. الشحن تقريبي: عدّليه حسب سعر الشركة قبل إرسال تفاصيل الدفع.</p>
         <form method="post" class="row ship">
           <input type="hidden" name="action" value="shipping" />
           <label class="sr-only" for="ship">كلفة الشحن الفعلية</label>
           <input id="ship" name="shipping" type="number" step="0.5" min="0" inputmode="decimal" value={o.shipping} />
           <button class="abtn" type="submit">تعديل الشحن</button>
-        </form>
+        </form></>}
       </section>
 
       <section class="apanel">
@@ -292,7 +296,7 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
             <label>ملاحظات<textarea name="notes" rows="2" maxlength="600">{o.notes ?? ''}</textarea></label>
             <button class="abtn" type="submit">حفظ</button>
           </form>
-          <p class="muted small">تغيير المحافظة لا يغيّر كلفة الشحن تلقائياً؛ عدّليها من قسم «الطلب والمبلغ».</p>
+          {!shippingOnDelivery && <p class="muted small">تغيير المحافظة لا يغيّر كلفة الشحن تلقائياً؛ عدّليها من قسم «الطلب والمبلغ».</p>}
         </details>
       </section>
 

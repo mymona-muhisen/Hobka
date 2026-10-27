@@ -3,7 +3,7 @@ import Admin from '../../layouts/Admin.astro';
 import Icon from '../../components/Icon.astro';
 import { sameOrigin } from '../../lib/auth';
 import { getSettings, saveSettings, AR_KEY_RE, type Settings } from '../../lib/settings';
-import { site } from '../../config/catalog';
+import { site, shippingOnDelivery } from '../../config/catalog';
 import type { StoryValue } from '../../config/catalog';
 
 export const prerender = false;
@@ -93,7 +93,7 @@ const boxLink = s.ar.key ? `${site.url}/ar/?k=${s.ar.key}` : '';
   <h1>الإعدادات</h1>
   {flash && <p class="flash">{flash}</p>}
   {error && <p class="flash bad" role="alert">{error}</p>}
-  <p class="muted">كل ما هنا يظهر في الموقع فوراً، بدون تعديل ملفات. <a href="#ar">تجربة حبّوك</a> · <a href="#contact">التواصل</a> · <a href="#texts">الدفع والمدد</a> · <a href="#shipping">الشحن</a> · <a href="#values">قيم القصة</a></p>
+  <p class="muted">كل ما هنا يظهر في الموقع فوراً، بدون تعديل ملفات. <a href="#ar">تجربة حبّوك</a> · <a href="#contact">التواصل</a> · <a href="#texts">الدفع والمدد</a>{!shippingOnDelivery && <> · <a href="#shipping">الشحن</a></>} · <a href="#values">قيم القصة</a></p>
 
   <section class="apanel" id="ar">
     <h2>تجربة حبّوك بالكاميرا (AR)</h2>
@@ -154,7 +154,7 @@ const boxLink = s.ar.key ? `${site.url}/ar/?k=${s.ar.key}` : '';
     </form>
   </section>
 
-  <section class="apanel" id="shipping">
+  {!shippingOnDelivery && <section class="apanel" id="shipping">
     <h2>أسعار الشحن</h2>
     <p class="muted small">أسعار تقريبية تظهر للأهل عند الطلب، ويمكنك تعديل الشحن لكل طلب من صفحته. «إخفاء» يزيل المحافظة من قائمة الطلب.</p>
     <form method="post">
@@ -172,7 +172,7 @@ const boxLink = s.ar.key ? `${site.url}/ar/?k=${s.ar.key}` : '';
       </div>
       <button class="abtn primary" type="submit">حفظ أسعار الشحن</button>
     </form>
-  </section>
+  </section>}
 
   <section class="apanel" id="values">
     <h2>قيم القصة الجاهزة</h2>

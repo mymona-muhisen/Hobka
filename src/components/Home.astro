@@ -2,7 +2,7 @@
 import Icon from './Icon.astro';
 import heart from '../assets/heart.svg?raw';
 import { ui, path, fill } from '../i18n/ui';
-import { contact, photoRetentionDays, type Lang, type Catalog } from '../config/catalog';
+import { contact, photoRetentionDays, shippingOnDelivery, type Lang, type Catalog } from '../config/catalog';
 import { money, activeBoxes, productImage } from '../lib/pricing';
 import { getSettings, activeValues } from '../lib/settings';
 
@@ -75,7 +75,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
           {productImage('box', b) && <img class="box-img" src={productImage('box', b)!} alt={b.name[lang]} loading="lazy" width="600" height="450" />}
           <h3>{b.name[lang]}</h3>
           <p class="tagline">{b.tagline[lang]}</p>
-          <p class="price"><span>{money(b.price, lang)}</span><small>{t.boxes.shipping}</small></p>
+          <p class="price"><span>{money(b.price, lang)}</span><small>{shippingOnDelivery ? t.boxes.shippingCod : t.boxes.shipping}</small></p>
           <ul>
             {b.includes.map((id) => (
               <li class:list={{ soon: items[id].status === 'soon' }}>

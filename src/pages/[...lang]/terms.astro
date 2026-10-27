@@ -1,7 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Prose from '../../components/Prose.astro';
-import { type Lang } from '../../config/catalog';
+import { shippingOnDelivery, type Lang } from '../../config/catalog';
 import { getSettings } from '../../lib/settings';
 export const prerender = false;
 if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
@@ -20,7 +20,9 @@ const { timing } = await getSettings(Astro.locals);
         <li>نبدأ الطباعة بعد وصول الدفعة، وتستغرق {timing.printDays.ar}، ثم نوصل الطلب أو نشحنه.</li>
       </ol>
       <h2>الأسعار والشحن</h2>
-      <p>الأسعار بالدولار الأمريكي كما تظهر عند الطلب. تكلفة الشحن التي تظهر تقريبية وتختلف حسب المحافظة، والسعر النهائي تحدده شركة الشحن ونؤكده لك قبل الدفع.</p>
+      <p>{shippingOnDelivery
+        ? 'الأسعار بالدولار الأمريكي كما تظهر عند الطلب. أجور الشحن لا تدخل في مبلغ الطلب: تدفعها لشركة التوصيل عند استلام الطلب، وتختلف حسب المحافظة.'
+        : 'الأسعار بالدولار الأمريكي كما تظهر عند الطلب. تكلفة الشحن التي تظهر تقريبية وتختلف حسب المحافظة، والسعر النهائي تحدده شركة الشحن ونؤكده لك قبل الدفع.'}</p>
       <h2>الإلغاء</h2>
       <p>يمكنك إلغاء الطلب مجاناً في أي وقت قبل الدفع. بعد بدء الطباعة لا يمكن الإلغاء، لأن كل قصة تُصنع خصيصاً لطفلك.</p>
       <h2>إذا وصل شيء تالفاً</h2>
@@ -37,7 +39,9 @@ const { timing } = await getSettings(Astro.locals);
         <li>Printing starts once payment arrives and takes {timing.printDays.en}, then we deliver or ship.</li>
       </ol>
       <h2>Prices and shipping</h2>
-      <p>Prices are in US dollars as shown when ordering. The shipping cost shown is approximate and depends on the governorate; the final price is set by the delivery company and confirmed before payment.</p>
+      <p>{shippingOnDelivery
+        ? 'Prices are in US dollars as shown when ordering. Shipping is not part of the order amount: you pay it to the delivery company when the order arrives, and it depends on the governorate.'
+        : 'Prices are in US dollars as shown when ordering. The shipping cost shown is approximate and depends on the governorate; the final price is set by the delivery company and confirmed before payment.'}</p>
       <h2>Cancellation</h2>
       <p>You can cancel for free anytime before payment. Once printing starts, orders cannot be cancelled because each story is made for your child.</p>
       <h2>If something arrives damaged</h2>

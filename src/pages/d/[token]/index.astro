@@ -8,6 +8,7 @@ import { getSettings } from '../../../lib/settings';
 import { loadCatalog } from '../../../lib/catalog';
 import { orderLines } from '../../../lib/orderLines';
 import { money } from '../../../lib/pricing';
+import { shippingOnDelivery } from '../../../config/catalog';
 
 export const prerender = false;
 const { contact } = await getSettings(Astro.locals);
@@ -43,7 +44,7 @@ const after = ['approved', 'paid', 'printing', 'shipped', 'delivered'].includes(
         <div><dt>{T.code}</dt><dd class="ltr">{order.code}</dd></div>
         <div><dt>{T.status}</dt><dd><span class="badge">{statuses[st]?.[lang] ?? st}</span></dd></div>
         {box && <div><dt>{ar ? 'الصندوق' : 'Box'}</dt><dd>{box.name[lang]}</dd></div>}
-        <div><dt>{T.total}</dt><dd>{money(order.total, lang)}</dd></div>
+        <div><dt>{T.total}</dt><dd>{money(order.total, lang)}{shippingOnDelivery && !order.shipping && <small>{ar ? ' + الشحن عند الاستلام' : ' + shipping on delivery'}</small>}</dd></div>
       </dl>
     </section>
 

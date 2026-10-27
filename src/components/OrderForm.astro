@@ -2,7 +2,7 @@
 import Icon from './Icon.astro';
 import { orderUi } from '../i18n/order';
 import { fill, path } from '../i18n/ui';
-import { maxPhotos, photoRetentionDays, ages, storyLanguages, artStyles, stylesEnabled, type Lang, type Catalog } from '../config/catalog';
+import { maxPhotos, photoRetentionDays, ages, storyLanguages, artStyles, stylesEnabled, shippingOnDelivery, type Lang, type Catalog } from '../config/catalog';
 import { money, publicCatalog, productImage } from '../lib/pricing';
 import { getSettings, activeGovernorates, activeValues } from '../lib/settings';
 
@@ -242,9 +242,9 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
           <label for="d-gov">{t.governorate}</label>
           <select id="d-gov" name="governorate" required>
             <option value="">{t.choose}</option>
-            {governorates.map((g) => <option value={g.id}>{g.name[lang]} (+{money(g.shipping, lang)})</option>)}
+            {governorates.map((g) => <option value={g.id}>{shippingOnDelivery ? g.name[lang] : `${g.name[lang]} (+${money(g.shipping, lang)})`}</option>)}
           </select>
-          <p class="hint">{t.shipNote}</p>
+          <p class="hint">{shippingOnDelivery ? t.shipCodNote : t.shipNote}</p>
           <p class="field-error" data-error="governorate" hidden></p>
         </div>
         <div class="field">
@@ -298,11 +298,11 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       <ul id="sum-lines"></ul>
       <dl class="totals">
         <div><dt>{t.subtotal}</dt><dd id="sum-sub">—</dd></div>
-        <div><dt>{t.shipping}</dt><dd id="sum-ship">{t.shippingPick}</dd></div>
+        <div><dt>{t.shipping}</dt><dd id="sum-ship">{shippingOnDelivery ? t.shippingCod : t.shippingPick}</dd></div>
         <div id="sum-disc-row" hidden><dt>{t.discountLine}</dt><dd id="sum-disc"></dd></div>
         <div class="total"><dt>{t.total}</dt><dd id="sum-total">—</dd></div>
       </dl>
-      <p class="muted small">{t.shipNote}</p>
+      <p class="muted small">{shippingOnDelivery ? t.shipCodNote : t.shipNote}</p>
       {!pricesAreFinal && <p class="muted small">{t.priceNote}</p>}
       <p class="muted small">{t.noPayNow}</p>
     </aside>
@@ -325,7 +325,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
 <script type="application/json" id="order-catalog" set:html={JSON.stringify(catalog).replace(/</g, '\\u003c')} />
 
 <script>
-  import { maxPhotos, type ItemId, type Catalog, type Text } from '../config/catalog';
+  import { maxPhotos, shippingOnDelivery, type ItemId, type Catalog, type Text } from '../config/catalog';
   import { computePrice, allowedAddons, money, type Discount } from '../lib/pricing';
 
   const CAT = JSON.parse(document.getElementById('order-catalog')!.textContent!) as Catalog & { values: { id: string; name: Text }[]; maxValues: number };
@@ -579,7 +579,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     if (!p) { ul.innerHTML = ''; $('#sum-sub').textContent = '—'; $('#sum-total').textContent = '—'; return; }
     ul.innerHTML = p.lines.map((l) => `<li><span>${lineName(l.id)}</span><span>${money(l.amount, L)}</span></li>`).join('');
     $('#sum-sub').textContent = money(p.subtotal, L);
-    $('#sum-ship').textContent = val('governorate') ? money(p.shipping, L) : str('shippingPick');
+    $('#sum-ship').textContent = shippingOnDelivery ? str('shippingCod') : val('governorate') ? money(p.shipping, L) : str('shippingPick');
     $('#sum-disc-row').hidden = !p.discount;
     $('#sum-disc').textContent = '−' + money(p.discount, L);
     $('#sum-total').textContent = money(p.total, L);
@@ -609,7 +609,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     const gov = governorates.find((g) => g.id === val('governorate'));
     rows.push([str('delivery'), `${esc(val('parentName'))} · <span dir="ltr">${esc(val('phone'))}</span> · ${esc(gov?.name[L] ?? '')}<br>${esc(val('address'))}`, 'delivery', true]);
     const p = priceNow();
-    if (p) rows.push([str('total'), `<strong>${money(p.total, L)}</strong>`, 'delivery', true]);
+    if (p) rows.push([str('total'), `<strong>${money(p.total, L)}</strong>` + (shippingOnDelivery ? ` <small>+ ${str('shipping')} ${L === 'en' ? str('shippingCod').toLowerCase() : str('shippingCod')}</small>` : ''), 'delivery', true]);
     $('#review').innerHTML = rows
       .map(([k, v, step, html]) => `<div><dt>${esc(k)}</dt><dd>${html ? v : esc(v)}</dd><button type="button" class="edit" data-go="${step}">${str('edit')}</button></div>`)
       .join('');

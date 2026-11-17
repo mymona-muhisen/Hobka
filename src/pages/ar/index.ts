@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import arPage from '../../ar/index.html?raw';
 import { getSettings } from '../../lib/settings';
 import { isAdmin } from '../../lib/auth';
+import { siteImg } from '../../lib/siteImages';
+import { site } from '../../config/catalog';
 
 /*
  * Habbouk camera experience. Open to everyone when the admin turns it on (/admin/settings#ar).
@@ -69,7 +71,7 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
   // The page loads its files relatively (style.css, app.js, lib/…), so it must live at /ar/ with the slash.
   if (!url.pathname.endsWith('/')) return Response.redirect(new URL('/ar/' + url.search, url), 301);
 
-  const { ar } = await getSettings(locals);
+  const { ar, images } = await getSettings(locals);
   const k = url.searchParams.get('k') ?? '';
 
   if (k) {
@@ -81,5 +83,11 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
   const open = ar.public || same(cookieOf(request), ar.key) || (await isAdmin(request));
   const headers: Record<string, string> = { 'content-type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' };
   if (!ar.public) headers['X-Robots-Tag'] = 'noindex';
-  return new Response(open ? arPage : LOCKED, { status: 200, headers });
+  // Habbouk's picture (loading screen, locked page, share preview) follows the one set in /admin/images.
+  const hb = siteImg(images, 'habbouk');
+  const html = (open ? arPage : LOCKED)
+    .replaceAll(`${site.url}/images/habbouk.webp`, site.url + hb.src)
+    .replace(/<img([^>]*?)src="\/images\/habbouk\.webp"([^>]*?)width="\d+" height="\d+"/g, `<img$1src="${hb.src}"$2width="${hb.w}" height="${hb.h}"`)
+    .replaceAll('/images/habbouk.webp', hb.src);
+  return new Response(html, { status: 200, headers });
 };

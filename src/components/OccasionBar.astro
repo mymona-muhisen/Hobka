@@ -1,0 +1,81 @@
+---
+import Icon from './Icon.astro';
+import { path } from '../i18n/ui';
+import { offLabel, type Occasion } from '../lib/occasion';
+import type { Lang } from '../config/catalog';
+
+/** Top bar during an occasion: its name, the discount and a live countdown to the occasion. */
+interface Props { lang: Lang; o: Occasion }
+const { lang, o } = Astro.props;
+const left = Math.max(0, Date.parse(o.endsAt) - Date.now());
+const parts = {
+  d: Math.floor(left / 86400000),
+  h: Math.floor((left % 86400000) / 3600000),
+  m: Math.floor((left % 3600000) / 60000),
+  s: Math.floor((left % 60000) / 1000),
+};
+const L = lang === 'ar'
+  ? { d: 'يوم', h: 'ساعة', m: 'دقيقة', s: 'ثانية', left: 'باقي', cta: 'شاهد العروض', ended: 'انتهى العرض' }
+  : { d: 'days', h: 'hrs', m: 'min', s: 'sec', left: 'Ends in', cta: 'See the offers', ended: 'The offer has ended' };
+const pad = (n: number) => String(n).padStart(2, '0');
+const name = o.name[lang] || o.name.ar;
+const note = o.note[lang];
+---
+<aside class="occ" data-end={o.endsAt} data-ended={L.ended} aria-label={name}>
+  <div class="container occ-in">
+    <p class="occ-title"><Icon name="gift" /><strong>{name}</strong><span class="occ-off">{offLabel(o, lang)}</span></p>
+    {note && <p class="occ-note">{note}</p>}
+    <div class="occ-count" role="timer" aria-label={`${L.left}`}>
+      <span class="occ-left">{L.left}</span>
+      {parts.d > 0 && <span class="u"><b data-u="d">{parts.d}</b><small>{L.d}</small></span>}
+      <span class="u"><b data-u="h">{pad(parts.h)}</b><small>{L.h}</small></span>
+      <span class="u"><b data-u="m">{pad(parts.m)}</b><small>{L.m}</small></span>
+      <span class="u"><b data-u="s">{pad(parts.s)}</b><small>{L.s}</small></span>
+    </div>
+    <a class="occ-cta" href={path(lang, '/') + '#boxes'}>{L.cta}</a>
+  </div>
+</aside>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.occ[data-end]').forEach((bar) => {
+    const end = Date.parse(bar.dataset.end!);
+    const set = (u: string, v: string) => { const el = bar.querySelector(`[data-u="${u}"]`); if (el) el.textContent = v; };
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const tick = () => {
+      const left = end - Date.now();
+      if (left <= 0) {
+        const count = bar.querySelector('.occ-count');
+        if (count) count.textContent = bar.dataset.ended!;
+        clearInterval(timer);
+        return;
+      }
+      set('d', String(Math.floor(left / 86400000)));
+      set('h', pad(Math.floor((left % 86400000) / 3600000)));
+      set('m', pad(Math.floor((left % 3600000) / 60000)));
+      set('s', pad(Math.floor((left % 60000) / 1000)));
+    };
+    const timer = setInterval(tick, 1000);
+    tick();
+  });
+</script>
+
+<style>
+  .occ { background: var(--color-brand); color: #fff; }
+  .occ-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2) var(--space-6); padding-block: var(--space-3); text-align: center; }
+  .occ p { margin: 0; }
+  .occ-title { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 1.05rem; }
+  .occ-title :global(svg) { width: 22px; height: 22px; color: var(--color-rose); flex: none; }
+  .occ-off { background: var(--color-rose); color: var(--color-brand-dark); font-weight: 800; border-radius: 999px; padding: 0.1rem 0.7rem; font-size: 0.95rem; }
+  .occ-note { color: #f6dce4; font-size: 0.95rem; flex-basis: 100%; order: 3; }
+  .occ-count { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; }
+  .occ-left { color: #f6dce4; font-weight: 500; }
+  .u { display: inline-grid; justify-items: center; min-width: 2.6rem; background: rgb(255 255 255 / 12%); border-radius: 10px; padding: 0.15rem 0.4rem; line-height: 1.1; }
+  .u b { font-family: var(--font-display); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .u small { font-size: 0.7rem; color: #f6dce4; font-weight: 500; }
+  .occ-cta { color: #fff; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .occ-cta:hover { color: var(--color-rose); }
+  @media (max-width: 640px) {
+    .occ-in { gap: var(--space-2) var(--space-3); padding-block: var(--space-2) var(--space-3); }
+    .occ-cta { flex-basis: 100%; order: 4; font-size: 0.95rem; }
+  }
+</style>

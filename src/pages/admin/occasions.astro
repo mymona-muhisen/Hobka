@@ -1,0 +1,175 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import Fields from '../../components/OccasionFields.astro';
+import { sameOrigin } from '../../lib/auth';
+import { getSettings, saveSettings, type Settings } from '../../lib/settings';
+import { loadCatalog } from '../../lib/catalog';
+import { activeBoxes, activeItems, money } from '../../lib/pricing';
+import { currentOccasion, fromLocalInput, salePrice, offLabel, type Occasion } from '../../lib/occasion';
+
+export const prerender = false;
+
+let error = '';
+const flash = Astro.url.searchParams.get('ok') ?? '';
+const randId = () => 'o-' + Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 6);
+
+const cat = await loadCatalog();
+const boxes = activeBoxes(cat);
+// Products that have their own price (as an add-on or sold alone) can be discounted too.
+const priced = activeItems(cat).filter((i) => i.status === 'available' && i.addonPrice !== null);
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  const f = await Astro.request.formData();
+  const g = (k: string, max = 200) => String(f.get(k) ?? '').trim().slice(0, max);
+  const action = g('action');
+  try {
+    const s: Settings = structuredClone(await getSettings());
+    const id = g('id', 40);
+    if (action === 'save' || action === 'new') {
+      if (!g('name_ar', 60)) throw new Error('اسم المناسبة بالعربية مطلوب.');
+      const startsAt = g('starts') ? fromLocalInput(g('starts')) : new Date().toISOString();
+      const endsAt = fromLocalInput(g('ends'));
+      if (!startsAt) throw new Error('تاريخ بداية العرض غير صحيح.');
+      if (!endsAt) throw new Error('تاريخ المناسبة (نهاية العداد) مطلوب.');
+      if (Date.parse(endsAt) <= Date.parse(startsAt)) throw new Error('موعد المناسبة يجب أن يكون بعد بداية العرض.');
+      const kind = g('kind') === 'fixed' ? 'fixed' : 'percent';
+      const value = Math.round(Number(g('value').replace(',', '.')) * 100) / 100;
+      if (!(value > 0) || (kind === 'percent' && value >= 100) || value > 100000) throw new Error('قيمة الخصم غير صحيحة (النسبة بين 1 و 99).');
+      const onBoxes = f.getAll('boxes').map(String).filter((x) => boxes.some((b) => b.id === x));
+      const onItems = f.getAll('items').map(String).filter((x) => priced.some((i) => i.id === x));
+      if (!onBoxes.length && !onItems.length) throw new Error('اختاري صندوقاً أو منتجاً واحداً على الأقل يشمله الخصم.');
+      if (kind === 'fixed') {
+        const tooBig = [...boxes.filter((b) => onBoxes.includes(b.id)).map((b) => ({ n: b.name.ar, p: b.price })), ...priced.filter((i) => onItems.includes(i.id)).map((i) => ({ n: i.name.ar, p: i.addonPrice! }))].find((x) => value >= x.p);
+        if (tooBig) throw new Error(`الخصم (${money(value)}) يساوي سعر «${tooBig.n}» أو أكبر منه.`);
+      }
+      const o: Occasion = {
+        id: action === 'new' ? randId() : id,
+        name: { ar: g('name_ar', 60), en: g('name_en', 60) || g('name_ar', 60) },
+        note: { ar: g('note_ar', 160), en: g('note_en', 160) },
+        startsAt, endsAt, kind, value, boxes: onBoxes, items: onItems,
+        allowCodes: f.get('allowCodes') === 'on',
+        enabled: f.get('enabled') === 'on',
+      };
+      if (action === 'save') {
+        const i = s.occasions.findIndex((x) => x.id === id);
+        if (i < 0) throw new Error('المناسبة غير موجودة.');
+        s.occasions[i] = o;
+      } else s.occasions.push(o);
+    } else if (action === 'toggle') {
+      const o = s.occasions.find((x) => x.id === id);
+      if (!o) throw new Error('المناسبة غير موجودة.');
+      o.enabled = !o.enabled;
+    } else if (action === 'delete') {
+      s.occasions = s.occasions.filter((x) => x.id !== id);
+    } else throw new Error('إجراء غير معروف');
+    await saveSettings(s);
+    return Astro.redirect('/admin/occasions?ok=' + encodeURIComponent('تم الحفظ ✓'), 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+const s = await getSettings();
+const nowT = Date.now();
+const live = currentOccasion(s.occasions, nowT);
+const list = [...s.occasions].sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt));
+const state = (o: Occasion) => {
+  if (!o.enabled) return { t: 'متوقفة', c: 'st-cancelled' };
+  if (Date.parse(o.endsAt) <= nowT) return { t: 'انتهت', c: 'st-delivered' };
+  if (Date.parse(o.startsAt) > nowT) return { t: 'قادمة', c: 'st-approved' };
+  return live?.id === o.id ? { t: 'ظاهرة الآن', c: 'st-paid' } : { t: 'متداخلة (لا تظهر)', c: 'st-new' };
+};
+const fmt = (iso: string) => new Date(iso).toLocaleString('ar-SY', { timeZone: 'Asia/Damascus', dateStyle: 'medium', timeStyle: 'short' });
+---
+<Admin title="المناسبات والعروض">
+  <h1>المناسبات والعروض</h1>
+  {flash && <p class="flash">{flash}</p>}
+  {error && <p class="flash bad" role="alert">{error}</p>}
+  <p class="muted">من «بداية العرض» حتى موعد المناسبة يظهر شريط أعلى الموقع فيه اسم المناسبة وعدّاد تنازلي لها، وتظهر المنتجات المختارة بالسعر الجديد والسعر القديم مشطوب. عند موعد المناسبة يختفي الشريط ويرجع السعر العادي تلقائياً. الأوقات بتوقيت دمشق.</p>
+  <p class="muted small-note">إن تداخلت مناسبتان مفعّلتان، تظهر التي موعدها أقرب. من فتح نموذج الطلب أثناء العرض يحتفظ بالسعر الذي رآه لساعتين بعد انتهاء العداد.</p>
+
+  {list.map((o) => {
+    const st = state(o);
+    return (
+      <details class="apanel prod">
+        <summary>
+          <strong>{o.name.ar}</strong>
+          <span class:list={['st', st.c]}>{st.t}</span>
+          <span class="muted">{offLabel(o, 'ar')} · حتى {fmt(o.endsAt)}</span>
+        </summary>
+        <div class="preview">
+          <p class="muted">الأسعار خلال العرض:</p>
+          <ul>
+            {boxes.filter((b) => o.boxes.includes(b.id)).map((b) => <li>{b.name.ar}: <s>{money(b.price)}</s> ← <strong>{money(salePrice(b.price, o))}</strong></li>)}
+            {priced.filter((i) => o.items.includes(i.id)).map((i) => <li>{i.name.ar}: <s>{money(i.addonPrice!)}</s> ← <strong>{money(salePrice(i.addonPrice!, o))}</strong></li>)}
+          </ul>
+          <p class="muted">من {fmt(o.startsAt)} إلى {fmt(o.endsAt)} · أكواد الخصم {o.allowCodes ? 'تُقبل مع العرض' : 'لا تُقبل مع العرض'}</p>
+        </div>
+        <form method="post" class="pform">
+          <input type="hidden" name="action" value="save" /><input type="hidden" name="id" value={o.id} />
+          <Fields o={o} boxes={boxes} priced={priced} />
+        </form>
+        <div class="row-acts">
+          <form method="post"><input type="hidden" name="action" value="toggle" /><input type="hidden" name="id" value={o.id} /><button class="abtn" type="submit">{o.enabled ? 'إيقاف' : 'تفعيل'}</button></form>
+          <form method="post" onsubmit="return confirm('حذف هذه المناسبة؟ الطلبات التي تمت خلالها تبقى بأسعارها.')"><input type="hidden" name="action" value="delete" /><input type="hidden" name="id" value={o.id} /><button class="abtn danger" type="submit">حذف</button></form>
+        </div>
+      </details>
+    );
+  })}
+  {!list.length && <p class="apanel muted">لا توجد مناسبات بعد.</p>}
+
+  <details class="apanel prod new" open={!list.length}>
+    <summary><strong>+ إضافة مناسبة</strong></summary>
+    <form method="post" class="pform">
+      <input type="hidden" name="action" value="new" />
+      <Fields boxes={boxes} priced={priced} />
+    </form>
+  </details>
+</Admin>
+
+<script>
+  // Show the price after the discount next to each checkbox while the admin types.
+  document.querySelectorAll<HTMLFormElement>('form.pform').forEach((form) => {
+    const kind = form.querySelector<HTMLSelectElement>('select[name="kind"]')!;
+    const value = form.querySelector<HTMLInputElement>('input[name="value"]')!;
+    const update = () => {
+      const v = Number(value.value.replace(',', '.'));
+      form.querySelectorAll<HTMLElement>('[data-price]').forEach((el) => {
+        const p = Number(el.dataset.price);
+        const out = el.querySelector('.after')!;
+        if (!(v > 0)) { out.textContent = ''; return; }
+        const n = Math.max(0, Math.round((kind.value === 'fixed' ? p - v : p * (1 - Math.min(99, v) / 100)) * 100) / 100);
+        out.textContent = ` ← ${Number.isInteger(n) ? n : n.toFixed(2)} $`;
+      });
+    };
+    kind.addEventListener('change', update);
+    value.addEventListener('input', update);
+    update();
+  });
+</script>
+<style>
+  .small-note { font-size: 0.9rem; }
+  .prod { padding: 0; overflow: hidden; }
+  .prod summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; padding: 1rem 1.25rem; list-style: none; }
+  .prod summary::-webkit-details-marker { display: none; }
+  .prod summary::before { content: '›'; font-size: 1.4rem; color: var(--color-brand); transition: transform .15s; }
+  .prod[open] summary::before { transform: rotate(90deg); }
+  .prod.new summary { color: var(--color-brand); }
+  .preview { padding: 0 1.25rem; }
+  .preview ul { margin: 0 0 0.5rem; padding-inline-start: 1.2rem; }
+  .preview p { margin: 0 0 0.4rem; }
+  .row-acts { display: flex; gap: 0.5rem; padding: 0 1.25rem 1.25rem; }
+  .row-acts form { margin: 0; }
+  :global(.pform) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; padding: 0 1.25rem 1rem; }
+  :global(.pform label) { display: grid; gap: 0.25rem; font-weight: 600; font-size: 0.92rem; }
+  :global(.pform input:not([type='checkbox'])), :global(.pform select) { font: inherit; font-weight: 400; padding: 0.55rem 0.75rem; border: 1.5px solid var(--color-border); border-radius: 12px; background: var(--color-paper); width: 100%; }
+  :global(.pform .wide) { grid-column: 1 / -1; }
+  :global(.pform fieldset) { border: 1px solid var(--color-border); border-radius: 12px; padding: 0.5rem 0.9rem 0.8rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+  :global(.pform legend) { font-weight: 700; font-size: 0.92rem; padding: 0 0.3rem; }
+  :global(.pform .cb) { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+  :global(.pform .cb input) { width: 18px; height: 18px; accent-color: var(--color-brand); }
+  :global(.pform .after) { color: var(--color-success); font-weight: 700; }
+  :global(.pform .hint) { font-weight: 400; color: var(--color-muted); font-size: 0.85rem; }
+  @media (max-width: 640px) { :global(.pform) { grid-template-columns: 1fr; } }
+</style>

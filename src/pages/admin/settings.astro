@@ -46,7 +46,6 @@ if (Astro.request.method === 'POST') {
         draftDays: { ar: g('draft_ar', 40) || s.timing.draftDays.ar, en: g('draft_en', 40) || s.timing.draftDays.en },
         printDays: { ar: g('print_ar', 40) || s.timing.printDays.ar, en: g('print_en', 40) || s.timing.printDays.en },
       };
-      s.pricesAreFinal = f.get('pricesAreFinal') === 'on';
       const mv = Math.floor(Number(g('maxValues')));
       if (!(mv >= 1 && mv <= 5)) throw new Error('عدد القيم المسموح بين 1 و 5.');
       s.maxValues = mv;
@@ -149,14 +148,13 @@ const boxLink = s.ar.key ? `${site.url}/ar/?k=${s.ar.key}` : '';
       <label>مدة الطباعة (عربي)<input name="print_ar" value={s.timing.printDays.ar} /></label>
       <label>مدة الطباعة (إنجليزي)<input name="print_en" value={s.timing.printDays.en} dir="ltr" /></label>
       <label>أقصى عدد قيم في القصة الواحدة<input name="maxValues" type="number" min="1" max="5" value={s.maxValues} /></label>
-      <label class="cb"><input type="checkbox" name="pricesAreFinal" checked={s.pricesAreFinal} />الأسعار نهائية (تُخفي ملاحظة «أسعار مبدئية»)</label>
       <div class="wide"><button class="abtn primary" type="submit">حفظ</button></div>
     </form>
   </section>
 
   {!shippingOnDelivery && <section class="apanel" id="shipping">
     <h2>أسعار الشحن</h2>
-    <p class="muted small">أسعار تقريبية تظهر للأهل عند الطلب، ويمكنك تعديل الشحن لكل طلب من صفحته. «إخفاء» يزيل المحافظة من قائمة الطلب.</p>
+    <p class="muted small">أسعار الشحن تظهر للأهل عند الطلب، ويمكنك تعديل الشحن لكل طلب من صفحته. «إخفاء» يزيل المحافظة من قائمة الطلب.</p>
     <form method="post">
       <input type="hidden" name="action" value="shipping" />
       <div class="ship">

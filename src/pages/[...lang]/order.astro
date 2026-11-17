@@ -1,14 +1,17 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { loadCatalog } from '../../lib/catalog';
+import { applyOccasion, currentOccasion } from '../../lib/occasion';
 import OrderForm from '../../components/OrderForm.astro';
 import { orderUi } from '../../i18n/order';
 import type { Lang } from '../../config/catalog';
+import { getSettings } from '../../lib/settings';
 
 export const prerender = false;
 if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
-const catalog = await loadCatalog();
+// During an occasion the chosen products carry the reduced price (old price kept to show it struck through).
+const catalog = applyOccasion(await loadCatalog(), currentOccasion((await getSettings(Astro.locals)).occasions));
 const t = orderUi[lang];
 ---
 <Base lang={lang} title={t.metaTitle} description={t.metaDesc} altPath={lang === 'ar' ? '/en/order' : '/order'}>

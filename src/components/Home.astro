@@ -2,17 +2,19 @@
 import Icon from './Icon.astro';
 import heart from '../assets/heart.svg?raw';
 import { ui, path, fill } from '../i18n/ui';
-import { contact, photoRetentionDays, shippingOnDelivery, type Lang, type Catalog } from '../config/catalog';
+import { contact, photoRetentionDays, shippingOnDelivery, type Lang } from '../config/catalog';
+import { offLabel, type SaleCatalog, type SaleBox } from '../lib/occasion';
+import { siteImg } from '../lib/siteImages';
 import { money, activeBoxes, productImage } from '../lib/pricing';
 import { getSettings, activeValues } from '../lib/settings';
 
-interface Props { lang: Lang; catalog: Catalog }
+interface Props { lang: Lang; catalog: SaleCatalog }
 const { lang, catalog } = Astro.props;
 const items = catalog.items;
-const boxes = activeBoxes(catalog);
+const boxes = activeBoxes(catalog) as SaleBox[];
 const t = ui[lang];
 const settings = await getSettings(Astro.locals);
-const { timing, pricesAreFinal } = settings;
+const { timing } = settings;
 // A short line of story values, situational ones first (they are what makes parents say "this is what we need now").
 const allValues = activeValues(settings);
 const PREFER = ['sleep', 'sibling', 'screens', 'courage', 'confidence', 'patience', 'friendship', 'prayer'];
@@ -24,6 +26,11 @@ const moreText = moreValues > 0
   : (lang === 'ar' ? 'أو فكرتك الخاصة' : 'or your own idea');
 const vars = { draft: timing.draftDays[lang], print: timing.printDays[lang], days: photoRetentionDays };
 const orderHref = path(lang, '/order');
+const img = (id: string) => siteImg(settings.images, id);
+const hero = img('hero'), seedling = img('seedling'), surprise = img('surprise'), hb = img('habbouk');
+const gKit = img('gallery-kit'), gGirl = img('gallery-girl'), gDoctor = img('gallery-doctor'), gGift = img('gallery-gift');
+const occ = catalog.occasion;
+const wasLabel = lang === 'ar' ? 'بدلاً من' : 'instead of';
 const standalone = Object.values(items).filter((i) => i.standalone && i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
 ---
 <!-- Hero -->
@@ -42,8 +49,8 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
     <div class="hero-media">
       <div class="blob" aria-hidden="true"></div>
       <picture>
-        <source media="(max-width: 700px)" srcset="/images/hero-book-sm.webp" />
-        <img src="/images/hero-book.webp" width="1400" height="933" alt={t.hero.imgAlt} fetchpriority="high" />
+        {hero.small && <source media="(max-width: 700px)" srcset={hero.small} />}
+        <img src={hero.src} width={hero.w} height={hero.h} alt={t.hero.imgAlt} fetchpriority="high" />
       </picture>
     </div>
   </div>
@@ -72,10 +79,11 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
       {boxes.map((b) => (
         <article class:list={['box', { popular: b.popular }]}>
           {b.popular && <span class="badge pop">{t.boxes.popular}</span>}
+          {b.was && occ && <span class="badge sale">{offLabel(occ, lang)}</span>}
           {productImage('box', b) && <img class="box-img" src={productImage('box', b)!} alt={b.name[lang]} loading="lazy" width="600" height="450" />}
           <h3>{b.name[lang]}</h3>
           <p class="tagline">{b.tagline[lang]}</p>
-          <p class="price"><span>{money(b.price, lang)}</span><small>{shippingOnDelivery ? t.boxes.shippingCod : t.boxes.shipping}</small></p>
+          <p class="price">{b.was && <s class="was"><span class="sr-only">{wasLabel} </span>{money(b.was, lang)}</s>}<span>{money(b.price, lang)}</span><small>{shippingOnDelivery ? t.boxes.shippingCod : t.boxes.shipping}</small></p>
           <ul>
             {b.includes.map((id) => (
               <li class:list={{ soon: items[id].status === 'soon' }}>
@@ -88,7 +96,6 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
         </article>
       ))}
     </div>
-    {!pricesAreFinal && <p class="price-note muted">{t.boxes.priceNote}</p>}
     <p class="timeline"><Icon name="truck" />{t.boxes.timeline}</p>
     <div class="values-line">
       <span class="vl-lead">{t.boxes.valuesLead}</span>
@@ -97,13 +104,13 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
     </div>
 
     <div class="standalone">
-      <img src="/images/seedling.webp" width="900" height="411" alt="" loading="lazy" class="st-img" />
+      <img src={seedling.src} width={seedling.w} height={seedling.h} alt="" loading="lazy" class="st-img" />
       <div>
         <h3>{t.standalone.title}</h3>
         <p class="muted">{t.standalone.sub}</p>
       </div>
       <ul>
-        {standalone.map((s) => <li>{productImage('item', s) && <img class="sa-img" src={productImage('item', s)!} alt="" loading="lazy" width="48" height="48" />}<span><strong>{s.name[lang]}</strong> <span class="muted">{money(s.addonPrice ?? 0, lang)}</span></span></li>)}
+        {standalone.map((s) => <li>{productImage('item', s) && <img class="sa-img" src={productImage('item', s)!} alt="" loading="lazy" width="48" height="48" />}<span><strong>{s.name[lang]}</strong> {s.wasAddon && <s class="was-sm"><span class="sr-only">{wasLabel} </span>{money(s.wasAddon, lang)}</s>} <span class:list={[s.wasAddon ? 'now' : 'muted']}>{money(s.addonPrice ?? 0, lang)}</span></span></li>)}
       </ul>
       <a class="btn btn-secondary" href={`${orderHref}?only=1`}>{t.standalone.cta}</a>
     </div>
@@ -129,7 +136,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
 <!-- Surprise -->
 <section class="section surprise">
   <div class="container sp-grid">
-    <img src="/images/surprise.webp" width="1200" height="675" alt={t.surprise.imgAlt} loading="lazy" class="sp-img" />
+    <img src={surprise.src} width={surprise.w} height={surprise.h} alt={t.surprise.imgAlt} loading="lazy" class="sp-img" />
     <div>
       <p class="eyebrow"><Icon name="eye" />{lang === 'ar' ? 'ما الذي نعرضه عليك قبل الطباعة؟' : 'What do we show you before printing?'}</p>
       <h2>{t.surprise.title}</h2>
@@ -146,10 +153,10 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
       <p>{t.gallery.sub}</p>
     </div>
     <div class="gal">
-      <img class="g1" src="/images/kit.webp" width="1000" height="1067" alt={t.gallery.kitAlt} loading="lazy" />
-      <img class="g2" src="/images/girl-reading.webp" width="1000" height="782" alt={t.gallery.girlAlt} loading="lazy" />
-      <img class="g3" src="/images/book-doctor.webp" width="1000" height="667" alt={t.gallery.doctorAlt} loading="lazy" />
-      <img class="g4" src="/images/gift.webp" width="900" height="900" alt={t.gallery.giftAlt} loading="lazy" />
+      <img class="g1" src={gKit.src} width={gKit.w} height={gKit.h} alt={t.gallery.kitAlt} loading="lazy" />
+      <img class="g2" src={gGirl.src} width={gGirl.w} height={gGirl.h} alt={t.gallery.girlAlt} loading="lazy" />
+      <img class="g3" src={gDoctor.src} width={gDoctor.w} height={gDoctor.h} alt={t.gallery.doctorAlt} loading="lazy" />
+      <img class="g4" src={gGift.src} width={gGift.w} height={gGift.h} alt={t.gallery.giftAlt} loading="lazy" />
     </div>
   </div>
 </section>
@@ -157,7 +164,7 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
 <!-- Habbouk -->
 <section class="section habbouk" id="habbouk">
   <div class="container hb-grid">
-    <img src="/images/habbouk.webp" width="520" height="607" alt={t.habbouk.imgAlt} loading="lazy" class="hb-img" />
+    <img src={hb.src} width={hb.w} height={hb.h} alt={t.habbouk.imgAlt} loading="lazy" class="hb-img" />
     <div>
       <h2>{t.habbouk.title}</h2>
       <p class="lead">{t.habbouk.text}</p>
@@ -231,12 +238,15 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   .price { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-4); }
   .price span { font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; color: var(--color-brand-dark); line-height: 1; }
   .price small { color: var(--color-muted); font-size: 0.9rem; }
+  .price .was { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--color-muted); text-decoration-thickness: 2px; text-decoration-color: var(--color-brand); }
+  .sale { position: absolute; z-index: 1; top: -14px; inset-inline-end: var(--space-6); background: var(--color-apricot); color: var(--color-brand-dark); }
+  .was-sm { color: var(--color-muted); text-decoration-color: var(--color-brand); }
+  .now { color: var(--color-brand-dark); font-weight: 800; }
   .box ul { list-style: none; padding: 0; margin: 0 0 var(--space-6); display: grid; gap: var(--space-2); flex: 1; align-content: start; }
   .box li { display: flex; gap: var(--space-2); align-items: flex-start; }
   .box li :global(svg) { width: 20px; height: 20px; color: var(--color-success); flex: none; margin-top: 4px; }
   .box li.soon { color: var(--color-muted); }
   .box li .badge { margin-inline-start: var(--space-2); font-size: 0.75rem; }
-  .price-note { text-align: center; margin-top: var(--space-4); font-size: 0.95rem; }
   .timeline { display: flex; justify-content: center; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; color: var(--color-brand-dark); font-weight: 500; text-align: center; }
   .timeline :global(svg) { width: 20px; height: 20px; flex: none; color: var(--color-brand); }
   .values-line { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2); margin: var(--space-8) auto 0; max-width: 900px; }

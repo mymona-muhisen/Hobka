@@ -6,11 +6,14 @@ import { contact, type Lang } from '../../config/catalog';
 import { activeItems, productImage } from '../../lib/pricing';
 import { path } from '../../i18n/ui';
 import { getSettings } from '../../lib/settings';
+import { siteImg } from '../../lib/siteImages';
 export const prerender = false;
 if (Astro.params.lang && Astro.params.lang !== 'en') return new Response(null, { status: 404 });
 const lang: Lang = Astro.params.lang === 'en' ? 'en' : 'ar';
 const catalog = await loadCatalog();
-const { ar: arSet } = await getSettings(Astro.locals);
+const { ar: arSet, images } = await getSettings(Astro.locals);
+const hb = siteImg(images, 'habbouk');
+const badge = siteImg(images, 'habbouk-badge');
 const ar = lang === 'ar';
 const T = ar
   ? {
@@ -32,7 +35,7 @@ const with_ = activeItems(catalog).filter((i) => i.id !== 'story');
 <Base lang={lang} title={T.title} description={T.lead} altPath={ar ? '/en/habbouk' : '/habbouk'}>
   <section class="hb container">
     <div class="intro">
-      <img src="/images/habbouk.webp" width="520" height="607" alt={T.alt} class="hb-img" fetchpriority="high" />
+      <img src={hb.src} width={hb.w} height={hb.h} alt={T.alt} class="hb-img" fetchpriority="high" />
       <div>
         <h1>{T.h1}</h1>
         <p class="lead">{T.lead}</p>
@@ -44,7 +47,7 @@ const with_ = activeItems(catalog).filter((i) => i.id !== 'story');
       {with_.map((it) => (
         <li>
           {productImage('item', it) ? <img src={productImage('item', it)!} width="600" height="450" alt={it.name[lang]} loading="lazy" class="item-img" />
-            : it.id === 'letter' && <img src="/images/habbouk-badge.webp" width="560" height="560" alt="" loading="lazy" class="badge-img" />}
+            : it.id === 'letter' && <img src={badge.src} width={badge.w} height={badge.h} alt="" loading="lazy" class="badge-img" />}
           <h3>{it.name[lang]} {it.status === 'soon' && <span class="badge badge-soon">{ar ? 'قريباً' : 'soon'}</span>}</h3>
           <p class="muted">{it.desc[lang]}</p>
         </li>

@@ -1,7 +1,7 @@
 import type { Catalog } from '../config/catalog';
 import type { OrderRow } from './db';
 
-export interface Line { id: string; kind: 'box' | 'item'; name_ar: string; name_en: string; price: number; cost: number }
+export interface Line { id: string; kind: 'box' | 'item'; name_ar: string; name_en: string; price: number; cost: number; /** price before the occasion discount */ was?: number }
 
 /** What the order contained: the snapshot saved at order time, or (older orders) rebuilt from the catalog. */
 export function orderLines(o: OrderRow, cat: Catalog): Line[] {

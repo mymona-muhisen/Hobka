@@ -2,25 +2,29 @@
 import Icon from './Icon.astro';
 import { orderUi } from '../i18n/order';
 import { fill, path } from '../i18n/ui';
-import { maxPhotos, photoRetentionDays, ages, storyLanguages, artStyles, stylesEnabled, shippingOnDelivery, type Lang, type Catalog } from '../config/catalog';
+import { maxPhotos, photoRetentionDays, ages, storyLanguages, artStyles, stylesEnabled, shippingOnDelivery, type Lang } from '../config/catalog';
+import type { SaleCatalog, SaleBox, SaleItem } from '../lib/occasion';
+import { siteImg } from '../lib/siteImages';
 import { money, publicCatalog, productImage } from '../lib/pricing';
 import { getSettings, activeGovernorates, activeValues } from '../lib/settings';
 
-interface Props { lang: Lang; catalog: Catalog }
+interface Props { lang: Lang; catalog: SaleCatalog }
 const { lang } = Astro.props;
 const settings = await getSettings(Astro.locals);
-const { timing, pricesAreFinal, maxValues } = settings;
+const { timing, maxValues } = settings;
 const storyValues = activeValues(settings);
 const governorates = activeGovernorates(settings);
-const catalog = { ...publicCatalog({ ...Astro.props.catalog, governorates }), values: storyValues.map(({ id, name }) => ({ id, name })), maxValues };
-const items = catalog.items;
-const boxes = catalog.boxes;
+const occasion = Astro.props.catalog.occasion;
+const catalog = { ...publicCatalog({ ...Astro.props.catalog, governorates }), occasion, values: storyValues.map(({ id, name }) => ({ id, name })), maxValues };
+const items = catalog.items as Record<string, SaleItem>;
+const boxes = catalog.boxes as SaleBox[];
+const face = siteImg(settings.images, 'habbouk-face');
 const t = orderUi[lang];
 const days = photoRetentionDays;
 const addonItems = Object.values(items).filter((i) => i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
 const ageList = Array.from({ length: ages.max - ages.min + 1 }, (_, i) => ages.min + i);
 const privacyHref = path(lang, '/privacy');
-const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, maxValues, pricesAreFinal };
+const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, maxValues };
 ---
 <div class="order container">
   <header class="order-head">
@@ -34,7 +38,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       <ol class="progress" aria-hidden="true"></ol>
       <p class="step-count" id="step-count" aria-live="polite"></p>
       <div class="guide" aria-hidden="true">
-        <img src="/images/habbouk-face.webp" width="177" height="200" alt="" />
+        <img src={face.src} width={face.w} height={face.h} alt="" />
         <p id="guide-text"></p>
       </div>
       <div class="form-error" id="form-error" role="alert" hidden></div>
@@ -48,7 +52,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
               <input type="radio" name="box" value={b.id} />
               <span class="choice-body">
                 {productImage('box', b) && <img class="c-img" src={productImage('box', b)!} alt="" loading="lazy" width="400" height="300" />}
-                <span class="choice-top"><strong>{b.name[lang]}</strong><span class="choice-price">{money(b.price, lang)}</span></span>
+                <span class="choice-top"><strong>{b.name[lang]}</strong><span class="choice-price">{b.was && <s class="was">{money(b.was, lang)}</s>}<span>{money(b.price, lang)}</span></span></span>
                 <span class="muted small">{b.includes.filter((id) => items[id].status === 'available').map((id) => items[id].name[lang]).join('، ')}</span>
                 {b.includes.some((id) => items[id].status === 'soon') && (
                   <span class="muted small">+ {b.includes.filter((id) => items[id].status === 'soon').map((id) => items[id].name[lang]).join('، ')} <span class="badge badge-soon">{lang === 'ar' ? 'قريباً' : 'soon'}</span></span>
@@ -210,7 +214,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
                 <span class="addon-row">
                   {productImage('item', it) && <img class="a-img" src={productImage('item', it)!} alt="" loading="lazy" width="72" height="72" />}
                   <span class="addon-text">
-                    <span class="choice-top"><strong>{it.name[lang]}</strong><span class="choice-price">+{money(it.addonPrice ?? 0, lang)}</span></span>
+                    <span class="choice-top"><strong>{it.name[lang]}</strong><span class="choice-price">{it.wasAddon && <s class="was">{money(it.wasAddon, lang)}</s>}<span>+{money(it.addonPrice ?? 0, lang)}</span></span></span>
                     <span class="muted small">{it.desc[lang]}</span>
                   </span>
                 </span>
@@ -302,8 +306,8 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
         <div id="sum-disc-row" hidden><dt>{t.discountLine}</dt><dd id="sum-disc"></dd></div>
         <div class="total"><dt>{t.total}</dt><dd id="sum-total">—</dd></div>
       </dl>
+      {occasion && <p class="sale-note small">{fill(t.saleNote, { name: occasion.name[lang] || occasion.name.ar })}</p>}
       <p class="muted small">{shippingOnDelivery ? t.shipCodNote : t.shipNote}</p>
-      {!pricesAreFinal && <p class="muted small">{t.priceNote}</p>}
       <p class="muted small">{t.noPayNow}</p>
     </aside>
   </div>
@@ -325,10 +329,12 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
 <script type="application/json" id="order-catalog" set:html={JSON.stringify(catalog).replace(/</g, '\\u003c')} />
 
 <script>
-  import { maxPhotos, shippingOnDelivery, type ItemId, type Catalog, type Text } from '../config/catalog';
+  import { maxPhotos, shippingOnDelivery, type ItemId, type Text } from '../config/catalog';
+  import type { SaleCatalog } from '../lib/occasion';
   import { computePrice, allowedAddons, money, type Discount } from '../lib/pricing';
 
-  const CAT = JSON.parse(document.getElementById('order-catalog')!.textContent!) as Catalog & { values: { id: string; name: Text }[]; maxValues: number };
+  const CAT = JSON.parse(document.getElementById('order-catalog')!.textContent!) as SaleCatalog & { values: { id: string; name: Text }[]; maxValues: number };
+  const OCC = CAT.occasion ?? null;
   const governorates = CAT.governorates ?? [];
   const storyValues = CAT.values;
   const maxValues = CAT.maxValues;
@@ -356,6 +362,12 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   const q = new URLSearchParams(location.search);
   const pre = q.get('only') ? 'only' : q.get('box');
   if (pre) (form.querySelector(`input[name="box"][value="${CSS.escape(pre)}"]`) as HTMLInputElement | null)?.click();
+  // ?only=1&add=cards: a product chosen from the home page is ticked already
+  const preAdd = q.get('add');
+  if (pre === 'only' && preAdd) {
+    const cb = form.querySelector(`input[name="addons"][value="${CSS.escape(preAdd)}"]`) as HTMLInputElement | null;
+    if (cb) cb.checked = true;
+  }
 
   const isOnly = () => radio('box') === 'only';
   const flow = () => (isOnly() ? ['kind', 'addons', 'delivery', 'review'] : ['kind', 'child', 'story', 'photo', 'addons', 'delivery', 'review']);
@@ -553,6 +565,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     const msg = $('#code-msg');
     discount = null;
     if (!code) { msg.textContent = ''; updateSummary(); return; }
+    if (OCC && !OCC.allowCodes) { msg.textContent = str('codeWithSale', { name: OCC.name[L] || OCC.name.ar }); msg.className = 'hint bad'; updateSummary(); return; }
     try {
       const r = await fetch('/api/discount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
       const j = (await r.json()) as { valid: boolean; code?: string; kind?: 'percent' | 'fixed'; value?: number };
@@ -573,11 +586,19 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
     const [kind, key] = id.split(':');
     return kind === 'box' ? boxes.find((b) => b.id === key)!.name[L] : items[key as ItemId].name[L];
   };
+  /** old price of a discounted line (occasion), to show it struck through */
+  const lineWas = (id: string) => {
+    const [kind, key] = id.split(':');
+    return kind === 'box' ? boxes.find((b) => b.id === key)?.was : items[key as ItemId]?.wasAddon;
+  };
   function updateSummary() {
     const p = priceNow();
     const ul = $('#sum-lines');
     if (!p) { ul.innerHTML = ''; $('#sum-sub').textContent = '—'; $('#sum-total').textContent = '—'; return; }
-    ul.innerHTML = p.lines.map((l) => `<li><span>${lineName(l.id)}</span><span>${money(l.amount, L)}</span></li>`).join('');
+    ul.innerHTML = p.lines.map((l) => {
+      const was = lineWas(l.id);
+      return `<li><span>${lineName(l.id)}</span><span>${was ? `<s class="was"><bdi>${money(was, L)}</bdi></s> ` : ''}<bdi>${money(l.amount, L)}</bdi></span></li>`;
+    }).join('');
     $('#sum-sub').textContent = money(p.subtotal, L);
     $('#sum-ship').textContent = shippingOnDelivery ? str('shippingCod') : val('governorate') ? money(p.shipping, L) : str('shippingPick');
     $('#sum-disc-row').hidden = !p.discount;
@@ -640,6 +661,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       photoConsent: ($('#p-consent') as HTMLInputElement).checked,
       parent: { name: val('parentName'), phone: val('phone'), governorate: val('governorate'), address: val('address'), notes: val('notes') },
       discountCode: discount ? discount.code : '',
+      occasion: OCC ? OCC.id : '',
       source: val('source'),
       privacyAccepted: true,
       website: val('website'),
@@ -651,7 +673,7 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
       const r = await fetch('/api/order', { method: 'POST', body: fd });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; code?: string; whatsapp?: string; error?: string };
       if (!r.ok || !j.ok) {
-        const map: Record<string, string> = { rate_limited: 'errRate', invalid: 'errInvalid', photo_too_large: 'errPhoto', photo_type: 'errPhoto', photo_missing: 'errPhoto', discount_invalid: 'errDiscount' };
+        const map: Record<string, string> = { rate_limited: 'errRate', invalid: 'errInvalid', photo_too_large: 'errPhoto', photo_type: 'errPhoto', photo_missing: 'errPhoto', discount_invalid: 'errDiscount', discount_with_sale: 'errCodeWithSale' };
         throw new Error(map[j.error ?? ''] ?? 'errGeneric');
       }
       // success: show a real confirmation from the server
@@ -728,7 +750,11 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   .choice input[type='checkbox']:checked + .choice-body::before { box-shadow: none; background: var(--color-brand) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/14px no-repeat; }
   .choice input:focus-visible + .choice-body { outline: 3px solid var(--color-apricot); outline-offset: 2px; }
   .choice-top { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
-  .choice-price { font-family: var(--font-display); font-weight: 800; color: var(--color-brand-dark); white-space: nowrap; }
+  .choice-price { font-family: var(--font-display); font-weight: 800; color: var(--color-brand-dark); white-space: nowrap; display: inline-flex; align-items: baseline; gap: 0.4em; }
+  .choice-price > * { unicode-bidi: isolate; }
+  .was { color: var(--color-muted); font-weight: 600; text-decoration-color: var(--color-brand); }
+  :global(#sum-lines .was) { color: var(--color-muted); text-decoration-color: var(--color-brand); }
+  .sale-note { color: var(--color-brand-dark); font-weight: 700; }
   .only-choice { grid-column: 1 / -1; }
   .c-img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; margin-bottom: var(--space-2); }
   .addon-row { display: flex; gap: var(--space-3); align-items: flex-start; }

@@ -1,0 +1,30 @@
+---
+import { money } from '../lib/pricing';
+import { toLocalInput, type Occasion } from '../lib/occasion';
+import type { Box, Item } from '../config/catalog';
+
+/** The fields of the admin occasion form (new or existing). */
+interface Props { o?: Occasion; boxes: Box[]; priced: Item[] }
+const { o, boxes, priced } = Astro.props;
+const isNew = !o;
+const nowLocal = toLocalInput(new Date().toISOString());
+---
+<label>اسم المناسبة (عربي)<input name="name_ar" value={o?.name.ar ?? ''} placeholder="مثلاً: عيد التحرير" required maxlength="60" /></label>
+<label>اسم المناسبة (إنجليزي)<input name="name_en" value={o?.name.en ?? ''} dir="ltr" placeholder="e.g. Liberation Day" maxlength="60" /></label>
+<label class="wide">سطر قصير تحت الاسم (عربي، اختياري)<input name="note_ar" value={o?.note.ar ?? ''} placeholder="مثلاً: اطلب قبل المناسبة بأسبوعين ليصل في وقته" maxlength="160" /></label>
+<label class="wide">سطر قصير (إنجليزي، اختياري)<input name="note_en" value={o?.note.en ?? ''} dir="ltr" maxlength="160" /></label>
+<label>بداية العرض <span class="hint">(فارغ = الآن)</span><input name="starts" type="datetime-local" value={o ? toLocalInput(o.startsAt) : ''} /></label>
+<label>موعد المناسبة <span class="hint">(العداد يعدّ له، والخصم ينتهي عنده)</span><input name="ends" type="datetime-local" value={o ? toLocalInput(o.endsAt) : ''} min={isNew ? nowLocal : undefined} required /></label>
+<label>نوع الخصم<select name="kind"><option value="percent" selected={o?.kind !== 'fixed'}>نسبة مئوية %</option><option value="fixed" selected={o?.kind === 'fixed'}>مبلغ ثابت $ من كل منتج</option></select></label>
+<label>قيمة الخصم<input name="value" type="number" step="0.5" min="0.5" value={o?.value ?? ''} required inputmode="decimal" /></label>
+<fieldset class="wide"><legend>الصناديق التي يشملها الخصم</legend>
+  {boxes.map((b) => <label class="cb" data-price={b.price}><input type="checkbox" name="boxes" value={b.id} checked={o ? o.boxes.includes(b.id) : true} />{b.name.ar} ({money(b.price)})<span class="after"></span></label>)}
+</fieldset>
+{priced.length > 0 && (
+  <fieldset class="wide"><legend>المنتجات (سعرها كإضافة أو منفردة)</legend>
+    {priced.map((i) => <label class="cb" data-price={i.addonPrice}><input type="checkbox" name="items" value={i.id} checked={o ? o.items.includes(i.id) : false} />{i.name.ar} ({money(i.addonPrice ?? 0)})<span class="after"></span></label>)}
+  </fieldset>
+)}
+<label class="cb wide"><input type="checkbox" name="allowCodes" checked={!!o?.allowCodes} />السماح بأكواد الخصم فوق سعر العرض</label>
+<label class="cb wide"><input type="checkbox" name="enabled" checked={o ? o.enabled : true} />مفعّلة</label>
+<div class="wide"><button class="abtn primary" type="submit">{isNew ? 'إضافة المناسبة' : 'حفظ'}</button></div>

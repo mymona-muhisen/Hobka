@@ -1,31 +1,37 @@
 import { db, now } from './db';
 import {
-  contact as defContact, payment as defPayment, timing as defTiming, pricesAreFinal as defFinal, maxValues as defMax,
+  contact as defContact, payment as defPayment, timing as defTiming, maxValues as defMax,
   governorates as defGovs, storyValues as defValues, type Governorate, type StoryValue, type Text,
 } from '../config/catalog';
+import { sanitizeOccasions, type Occasion } from './occasion';
+import { sanitizeImages, type StoredImage } from './siteImages';
 
 /** Everything the admin can change from /admin/settings. Defaults come from config/catalog.ts. */
 export interface Settings {
   contact: { whatsapp: string; whatsappDisplay: string; instagram: string; facebook: string };
   payment: Text;
   timing: { draftDays: Text; printDays: Text };
-  pricesAreFinal: boolean;
   maxValues: number;
   governorates: (Governorate & { hidden?: boolean })[];
   values: StoryValue[];
   /** Habbouk camera experience (/ar/): open to everyone, or only to box owners who scan the box QR (link with ?k=key). */
   ar: { public: boolean; key: string };
+  /** occasions with a discount and a countdown (/admin/occasions) */
+  occasions: Occasion[];
+  /** site pictures replaced from /admin/images (missing = original file) */
+  images: Record<string, StoredImage>;
 }
 
 export const defaultSettings: Settings = {
   contact: { whatsapp: defContact.whatsapp, whatsappDisplay: defContact.whatsappDisplay, instagram: defContact.instagram, facebook: defContact.facebook },
   payment: defPayment.instructions,
   timing: { draftDays: defTiming.draftDays, printDays: defTiming.printDays },
-  pricesAreFinal: defFinal,
   maxValues: defMax,
   governorates: defGovs.map((g) => ({ ...g })),
   values: defValues.map((v) => ({ ...v })),
   ar: { public: false, key: '' },
+  occasions: [],
+  images: {},
 };
 
 /** Box key: letters and digits only, so it fits in a short QR link. */
@@ -45,7 +51,6 @@ function merge(stored: Partial<Settings> | null): Settings {
       draftDays: { ...defaultSettings.timing.draftDays, ...(s.timing?.draftDays ?? {}) },
       printDays: { ...defaultSettings.timing.printDays, ...(s.timing?.printDays ?? {}) },
     },
-    pricesAreFinal: typeof s.pricesAreFinal === 'boolean' ? s.pricesAreFinal : defaultSettings.pricesAreFinal,
     maxValues: Number.isInteger(s.maxValues) && s.maxValues! >= 1 ? s.maxValues! : defaultSettings.maxValues,
     governorates: [...govs, ...missing],
     values: Array.isArray(s.values) ? s.values : defaultSettings.values,
@@ -53,6 +58,8 @@ function merge(stored: Partial<Settings> | null): Settings {
       public: typeof s.ar?.public === 'boolean' ? s.ar.public : defaultSettings.ar.public,
       key: typeof s.ar?.key === 'string' && AR_KEY_RE.test(s.ar.key) ? s.ar.key : '',
     },
+    occasions: sanitizeOccasions(s.occasions),
+    images: sanitizeImages(s.images),
   };
 }
 

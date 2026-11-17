@@ -22,7 +22,7 @@ const { timing } = await getSettings(Astro.locals);
       <h2>الأسعار والشحن</h2>
       <p>{shippingOnDelivery
         ? 'الأسعار بالدولار الأمريكي كما تظهر عند الطلب. أجور الشحن لا تدخل في مبلغ الطلب: تدفعها لشركة التوصيل عند استلام الطلب، وتختلف حسب المحافظة.'
-        : 'الأسعار بالدولار الأمريكي كما تظهر عند الطلب. تكلفة الشحن التي تظهر تقريبية وتختلف حسب المحافظة، والسعر النهائي تحدده شركة الشحن ونؤكده لك قبل الدفع.'}</p>
+        : 'الأسعار بالدولار الأمريكي كما تظهر عند الطلب. تُضاف إليها كلفة الشحن حسب المحافظة.'}</p>
       <h2>الإلغاء</h2>
       <p>يمكنك إلغاء الطلب مجاناً في أي وقت قبل الدفع. بعد بدء الطباعة لا يمكن الإلغاء، لأن كل قصة تُصنع خصيصاً لطفلك.</p>
       <h2>إذا وصل شيء تالفاً</h2>
@@ -41,7 +41,7 @@ const { timing } = await getSettings(Astro.locals);
       <h2>Prices and shipping</h2>
       <p>{shippingOnDelivery
         ? 'Prices are in US dollars as shown when ordering. Shipping is not part of the order amount: you pay it to the delivery company when the order arrives, and it depends on the governorate.'
-        : 'Prices are in US dollars as shown when ordering. The shipping cost shown is approximate and depends on the governorate; the final price is set by the delivery company and confirmed before payment.'}</p>
+        : 'Prices are in US dollars as shown when ordering. Shipping is added according to the governorate.'}</p>
       <h2>Cancellation</h2>
       <p>You can cancel for free anytime before payment. Once printing starts, orders cannot be cancelled because each story is made for your child.</p>
       <h2>If something arrives damaged</h2>

@@ -8,6 +8,7 @@ import { clientKey } from '../../lib/auth';
 import { maxPhotos, photoRetentionDays } from '../../config/catalog';
 import { getSettings, activeGovernorates, activeValues } from '../../lib/settings';
 import { sanitizeImage } from '../../lib/image';
+import { applyOccasion, occasionForOrder, type SaleBox } from '../../lib/occasion';
 
 export const prerender = false;
 
@@ -47,10 +48,13 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
+  // Occasion prices: only for a form that showed them, and only while the occasion runs (plus a short grace).
+  const occ = occasionForOrder(settings.occasions, o.occasion);
+  if (occ && o.discountCode && !occ.allowCodes) return fail(422, 'discount_with_sale');
   const discount = o.discountCode ? await findDiscount(o.discountCode) : null;
   if (o.discountCode && !discount) return fail(422, 'discount_invalid');
 
-  const cat = { ...(await loadCatalog()), governorates: govs };
+  const cat = { ...applyOccasion(await loadCatalog(), occ), governorates: govs };
   let price;
   try {
     price = computePrice(cat, { kind: o.kind, box: o.box ?? null, addons: o.addons, governorate: o.parent.governorate }, discount);
@@ -61,7 +65,8 @@ export const POST: APIRoute = async ({ request }) => {
   const lines = price.lines.map((l) => {
     const [kind, id] = l.id.split(':');
     const p = kind === 'box' ? cat.boxes.find((b) => b.id === id)! : cat.items[id];
-    return { id, kind, name_ar: p.name.ar, name_en: p.name.en, price: l.amount, cost: l.cost };
+    const was = kind === 'box' ? (cat.boxes as SaleBox[]).find((b) => b.id === id)?.was : cat.items[id]?.wasAddon;
+    return { id, kind, name_ar: p.name.ar, name_en: p.name.en, price: l.amount, cost: l.cost, ...(was ? { was } : {}) };
   });
   const code = newCode();
   const token = newToken();
@@ -72,14 +77,15 @@ export const POST: APIRoute = async ({ request }) => {
   const res = await d
     .prepare(
       `INSERT INTO orders (code, token, created_at, updated_at, status, site_lang, kind, box, addons, child, photo_mode, photo_count, photo_consent,
-        parent_name, phone, governorate, address, notes, discount_code, subtotal, shipping, discount, total, lines, cost_total, source)
-       VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        parent_name, phone, governorate, address, notes, discount_code, subtotal, shipping, discount, total, lines, cost_total, source, occasion)
+       VALUES (?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       code, token, t, t, o.siteLang, o.kind, isBox ? o.box : null, JSON.stringify(price.lines.filter((l) => l.id.startsWith('addon:')).map((l) => l.id.slice(6))),
       child ? JSON.stringify(child) : null, isBox ? o.photoMode : 'none', photos.length, o.photoConsent ? 1 : 0,
       o.parent.name, o.parent.phone, o.parent.governorate, o.parent.address, o.parent.notes || null, discount?.code ?? null,
       price.subtotal, price.shipping, price.discount, price.total, JSON.stringify(lines), price.cost, o.source || null,
+      occ ? JSON.stringify({ id: occ.id, name_ar: occ.name.ar, name_en: occ.name.en, kind: occ.kind, value: occ.value }) : null,
     )
     .run();
   const orderId = Number(res.meta?.last_row_id ?? 0);

@@ -1,0 +1,160 @@
+---
+import Admin from '../../layouts/Admin.astro';
+import { sameOrigin } from '../../lib/auth';
+import { getSettings, saveSettings, type Settings } from '../../lib/settings';
+import { env } from '../../lib/db';
+import { sanitizeImage } from '../../lib/image';
+import { IMAGE_SLOTS, siteImg, kvKey } from '../../lib/siteImages';
+
+export const prerender = false;
+
+let error = '';
+const flash = Astro.url.searchParams.get('ok') ?? '';
+const MAX_BYTES = 3 * 1024 * 1024;
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) return new Response('Forbidden', { status: 403 });
+  const f = await Astro.request.formData();
+  const action = String(f.get('action') ?? '');
+  const slot = IMAGE_SLOTS.find((x) => x.id === String(f.get('slot') ?? ''));
+  try {
+    if (!slot) throw new Error('صورة غير معروفة.');
+    const s: Settings = structuredClone(await getSettings());
+    const old = s.images[slot.id];
+    const dropOld = async () => {
+      if (!old) return;
+      await env.PHOTOS.delete(kvKey(slot.id, old.v));
+      if (old.small) await env.PHOTOS.delete(kvKey(slot.id, old.v, true));
+    };
+    const read = async (name: string) => {
+      const file = f.get(name);
+      if (!(typeof file === 'object' && file !== null && 'arrayBuffer' in file && (file as File).size > 0)) return null;
+      if ((file as File).size > MAX_BYTES) throw new Error('الصورة أكبر من 3 ميغابايت.');
+      const clean = sanitizeImage(await (file as File).arrayBuffer());
+      if (!clean) throw new Error('الملف ليس صورة سليمة (JPG أو PNG أو WebP).');
+      return clean;
+    };
+    if (action === 'upload') {
+      const main = await read('image');
+      if (!main) throw new Error('اختاري صورة أولاً.');
+      const small = slot.small ? await read('image_small') : null;
+      const v = Math.floor(Date.now() / 1000);
+      await env.PHOTOS.put(kvKey(slot.id, v), main.buf, { metadata: { type: main.type } });
+      if (small) await env.PHOTOS.put(kvKey(slot.id, v, true), small.buf, { metadata: { type: small.type } });
+      s.images[slot.id] = { v, w: main.width, h: main.height, ...(small ? { small: true } : {}) };
+      await saveSettings(s);
+      if (old && old.v !== v) await dropOld();
+    } else if (action === 'reset') {
+      delete s.images[slot.id];
+      await saveSettings(s);
+      await dropOld();
+    } else throw new Error('إجراء غير معروف');
+    return Astro.redirect('/admin/images?ok=' + encodeURIComponent(action === 'reset' ? 'رجعت الصورة الأصلية ✓' : 'تم تغيير الصورة ✓') + '#' + slot.id, 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+const s = await getSettings();
+---
+<Admin title="صور الموقع">
+  <h1>صور الموقع</h1>
+  {flash && <p class="flash">{flash}</p>}
+  {error && <p class="flash bad" role="alert">{error}</p>}
+  <p class="muted">كل صور الموقع غير صور المنتجات (صور المنتجات والصناديق من صفحة <a href="/admin/products">المنتجات</a>). الصورة الجديدة تُصغَّر على جهازك قبل الرفع، وتظهر في الموقع فوراً. «الرجوع للصورة الأصلية» يعيد الصورة التي كانت مع الموقع من البداية.</p>
+  <p class="muted">الصور المكتوب عندها «خلفية شفافة» ارفعيها PNG مقصوصة الخلفية، وإلا ستظهر بخلفية مربعة.</p>
+
+  <div class="grid">
+    {IMAGE_SLOTS.map((slot) => {
+      const cur = siteImg(s.images, slot.id);
+      return (
+        <section class="apanel slot" id={slot.id}>
+          <div class:list={['frame', { checker: slot.transparent }]}><img src={cur.src} alt="" loading="lazy" /></div>
+          <div class="info">
+            <h2>{slot.label} {cur.custom ? <span class="st st-paid">صورتك</span> : <span class="st st-delivered">الأصلية</span>}</h2>
+            <p class="muted small">{slot.where}</p>
+            <p class="muted small">الشكل المناسب: {slot.shape}{cur.custom && ` · الحالية ${cur.w}×${cur.h}`}</p>
+            <form method="post" enctype="multipart/form-data" class="up">
+              <input type="hidden" name="action" value="upload" /><input type="hidden" name="slot" value={slot.id} />
+              <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/heic" required
+                data-max={slot.max} data-small={slot.small?.max ?? ''} data-transparent={slot.transparent ? '1' : ''} />
+              {slot.small && <input type="file" name="image_small" hidden />}
+              <button class="abtn primary" type="submit">رفع الصورة</button>
+            </form>
+            {cur.custom && (
+              <form method="post" onsubmit="return confirm('الرجوع للصورة الأصلية؟ ستُحذف صورتك.')">
+                <input type="hidden" name="action" value="reset" /><input type="hidden" name="slot" value={slot.id} />
+                <button class="abtn" type="submit">الرجوع للصورة الأصلية</button>
+              </form>
+            )}
+          </div>
+        </section>
+      );
+    })}
+  </div>
+</Admin>
+
+<script>
+  // Shrink in the browser before upload. Cut-outs (transparent) stay PNG/WebP; photos become JPEG.
+  async function resize(file: File, max: number, transparent: boolean): Promise<File> {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    const ctx = c.getContext('2d')!;
+    if (!transparent) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = (type: string, q?: number) => new Promise<Blob>((r, j) => c.toBlob((b) => (b ? r(b) : j(new Error('blob'))), type, q));
+    let b: Blob;
+    if (transparent) {
+      b = await blob('image/webp', 0.9);
+      if (b.type !== 'image/webp') b = await blob('image/png'); // Safari can't write WebP
+    } else b = await blob('image/jpeg', 0.85);
+    const ext = b.type === 'image/jpeg' ? 'jpg' : b.type.split('/')[1];
+    return new File([b], `image.${ext}`, { type: b.type });
+  }
+  const put = (inp: HTMLInputElement, f: File) => { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; };
+
+  document.querySelectorAll<HTMLInputElement>('input[type=file][data-max]').forEach((inp) =>
+    inp.addEventListener('change', async () => {
+      const f = inp.files?.[0];
+      if (!f) return;
+      const form = inp.form!;
+      const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+      btn.disabled = true;
+      try {
+        const transparent = inp.dataset.transparent === '1';
+        const main = await resize(f, Number(inp.dataset.max), transparent);
+        if (inp.dataset.small) {
+          const smallInput = form.querySelector<HTMLInputElement>('input[name="image_small"]');
+          if (smallInput) put(smallInput, await resize(f, Number(inp.dataset.small), transparent));
+        }
+        put(inp, main);
+        const img = inp.closest('.slot')!.querySelector<HTMLImageElement>('.frame img')!;
+        img.src = URL.createObjectURL(main);
+        btn.textContent = 'حفظ الصورة الجديدة';
+      } catch {
+        alert('تعذّر قراءة الصورة. جرّبي صورة JPG أو PNG.');
+        inp.value = '';
+      } finally { btn.disabled = false; }
+    }),
+  );
+</script>
+
+<style>
+  .grid { display: grid; gap: 1rem; }
+  .slot { display: grid; grid-template-columns: 180px 1fr; gap: 1rem 1.25rem; align-items: start; margin: 0; scroll-margin-top: 80px; }
+  .frame { width: 180px; height: 140px; border-radius: 12px; overflow: hidden; background: var(--color-rose-soft); display: grid; place-items: center; }
+  .frame img { width: 100%; height: 100%; object-fit: contain; }
+  .checker { background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 16px 16px; }
+  .info h2 { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.3rem; }
+  .info p { margin: 0 0 0.4rem; }
+  .small { font-size: 0.9rem; }
+  .up { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0; }
+  .up input[type=file] { font: inherit; max-width: 100%; }
+  form { margin: 0; }
+  @media (max-width: 640px) {
+    .slot { grid-template-columns: 1fr; }
+    .frame { width: 100%; height: 180px; }
+  }
+</style>

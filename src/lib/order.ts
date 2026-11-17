@@ -36,6 +36,8 @@ export const orderSchema = z
       notes: trim(600).default(''),
     }),
     discountCode: trim(30).default(''),
+    /** id of the occasion whose prices the form showed ('' = none) */
+    occasion: trim(40).default(''),
     source: z.enum(['', 'instagram', 'facebook', 'whatsapp', 'friend', 'search', 'other']).default(''),
     privacyAccepted: z.literal(true),
     /** honeypot: real people leave it empty */

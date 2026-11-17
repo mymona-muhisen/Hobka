@@ -109,6 +109,7 @@ const lang = o.site_lang === 'en' ? 'en' : 'ar';
 const child = o.child ? (JSON.parse(o.child) as ChildInput) : null;
 const cat = await loadCatalog({ includeDeleted: true });
 const lines = orderLines(o, cat);
+const occ = (() => { try { return o.occasion ? (JSON.parse(o.occasion) as { name_ar: string; kind: 'percent' | 'fixed'; value: number }) : null; } catch { return null; } })();
 const gov = governorates.find((g) => g.id === o.governorate);
 const { results: events } = await d.prepare('SELECT * FROM order_events WHERE order_id = ? ORDER BY id DESC LIMIT 50').bind(o.id).all<{ at: string; actor: string; type: string; note: string | null }>();
 const draftLink = `${Astro.url.origin}/d/${o.token}`;
@@ -240,16 +241,17 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
       <section class="apanel">
         <h2>الطلب والمبلغ</h2>
         <ul class="lines">
-          {lines.map((l) => <li><span>{l.name_ar}</span><span>{money(l.price)}</span></li>)}
+          {lines.map((l) => <li><span>{l.name_ar}</span><span>{l.was && <s class="was">{money(l.was)}</s>}{money(l.price)}</span></li>)}
           {shippingOnDelivery && !o.shipping
             ? <li><span>الشحن ({gov?.name.ar})</span><span>عند الاستلام</span></li>
             : <li><span>الشحن ({gov?.name.ar})</span><span>{money(o.shipping)}</span></li>}
           {o.discount > 0 && <li><span>خصم <span class="ltr">{o.discount_code}</span></span><span>−{money(o.discount)}</span></li>}
+          {occ && <li class="occ"><span>بسعر عرض «{occ.name_ar}»</span><span>{occ.kind === 'percent' ? `${occ.value}%` : money(occ.value)}</span></li>}
           <li class="total"><span>المجموع</span><span>{money(o.total)}</span></li>
         </ul>
         {shippingOnDelivery && !o.shipping
           ? <p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. الشحن غير داخل في المبلغ: يدفعه العميل لشركة التوصيل عند الاستلام.</p>
-          : <><p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. الشحن تقريبي: عدّليه حسب سعر الشركة قبل إرسال تفاصيل الدفع.</p>
+          : <><p class="muted small">الأسعار محفوظة كما كانت لحظة الطلب. عدّلي الشحن حسب سعر الشركة قبل إرسال تفاصيل الدفع.</p>
         <form method="post" class="row ship">
           <input type="hidden" name="action" value="shipping" />
           <label class="sr-only" for="ship">كلفة الشحن الفعلية</label>
@@ -377,6 +379,8 @@ const eventLabel: Record<string, string> = { created: 'أُنشئ الطلب', s
   .costs label { display: grid; gap: 0.2rem; font-size: 0.85rem; font-weight: 600; }
   .costs input { font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); width: 100%; }
   .lines .neg { color: var(--color-error); }
+  .lines .was { color: var(--color-muted); margin-inline-end: 0.4rem; }
+  .lines .occ { color: var(--color-brand); font-weight: 600; }
   .dform { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
   .dform label { display: grid; gap: 0.2rem; font-size: 0.85rem; font-weight: 600; }
   .dform input, .dform select, .dform textarea { font: inherit; padding: 0.5rem; border-radius: 12px; border: 1.5px solid var(--color-border); width: 100%; background: #fff; }

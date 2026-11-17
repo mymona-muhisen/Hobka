@@ -362,6 +362,12 @@ const strings = { ...t, lang, draft: timing.draftDays[lang], days, maxPhotos, ma
   const q = new URLSearchParams(location.search);
   const pre = q.get('only') ? 'only' : q.get('box');
   if (pre) (form.querySelector(`input[name="box"][value="${CSS.escape(pre)}"]`) as HTMLInputElement | null)?.click();
+  // ?only=1&add=cards: a product chosen from the home page is ticked already
+  const preAdd = q.get('add');
+  if (pre === 'only' && preAdd) {
+    const cb = form.querySelector(`input[name="addons"][value="${CSS.escape(preAdd)}"]`) as HTMLInputElement | null;
+    if (cb) cb.checked = true;
+  }
 
   const isOnly = () => radio('box') === 'only';
   const flow = () => (isOnly() ? ['kind', 'addons', 'delivery', 'review'] : ['kind', 'child', 'story', 'photo', 'addons', 'delivery', 'review']);

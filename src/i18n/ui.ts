@@ -25,7 +25,7 @@ export const ui = {
       { t: 'شكله قبل الدفع', d: 'نرسل لك رسمة طفلك لتوافق على الشبه، والقصة تبقى مفاجأة.' },
     ],
     boxes: { title: 'اختر صندوق حكايتك', sub: 'كل صندوق يبدأ بقصة مطبوعة بطلها طفلك.', popular: 'الأكثر اختياراً', choose: 'اختر هذا الصندوق', valuesLead: 'حكايات عن:', valuesMore: 'و{n} قيمة غيرها، أو فكرتك الخاصة', timeline: 'من الطلب إلى الاستلام حوالي أسبوعين. للمناسبات، اطلب قبلها بأسبوعين على الأقل.', soon: 'قريباً', shipping: '+ الشحن حسب المحافظة', shippingCod: 'الشحن يُدفع عند الاستلام' },
-    standalone: { title: 'منتجات حبّوك منفردة', sub: 'لأي طفل، حتى بدون قصة.', cta: 'اطلبها وحدها' },
+    standalone: { title: 'منتجات حبّوك منفردة', sub: 'لأي طفل، حتى بدون قصة. تُطلب وحدها أو مع أي صندوق.', cta: 'اطلبها وحدها', one: 'اطلب الآن' },
     how: {
       title: 'كيف تعمل حبكة؟',
       steps: [
@@ -86,7 +86,7 @@ export const ui = {
       { t: 'Their look before payment', d: 'We send your child’s drawing to approve the likeness; the story stays a surprise.' },
     ],
     boxes: { title: 'Choose your story box', sub: 'Every box starts with a printed story starring your child.', popular: 'Most chosen', choose: 'Choose this box', valuesLead: 'Stories about:', valuesMore: 'and {n} more values, or your own idea', timeline: 'About two weeks from order to delivery. For occasions, order at least two weeks ahead.', soon: 'Soon', shipping: '+ shipping by governorate', shippingCod: 'Shipping paid on delivery' },
-    standalone: { title: 'Habbouk products on their own', sub: 'For any child, even without a story.', cta: 'Order them alone' },
+    standalone: { title: 'Habbouk products on their own', sub: 'For any child, even without a story. Order them alone or with any box.', cta: 'Order them alone', one: 'Order now' },
     how: {
       title: 'How Hobka works',
       steps: [

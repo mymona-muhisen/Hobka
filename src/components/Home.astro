@@ -3,7 +3,7 @@ import Icon from './Icon.astro';
 import heart from '../assets/heart.svg?raw';
 import { ui, path, fill } from '../i18n/ui';
 import { contact, photoRetentionDays, shippingOnDelivery, type Lang } from '../config/catalog';
-import { offLabel, type SaleCatalog, type SaleBox } from '../lib/occasion';
+import { offLabel, type SaleCatalog, type SaleBox, type SaleItem } from '../lib/occasion';
 import { siteImg } from '../lib/siteImages';
 import { money, activeBoxes, productImage } from '../lib/pricing';
 import { getSettings, activeValues } from '../lib/settings';
@@ -31,7 +31,7 @@ const hero = img('hero'), seedling = img('seedling'), surprise = img('surprise')
 const gKit = img('gallery-kit'), gGirl = img('gallery-girl'), gDoctor = img('gallery-doctor'), gGift = img('gallery-gift');
 const occ = catalog.occasion;
 const wasLabel = lang === 'ar' ? 'بدلاً من' : 'instead of';
-const standalone = Object.values(items).filter((i) => i.standalone && i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
+const standalone = (Object.values(items) as SaleItem[]).filter((i) => i.standalone && i.status === 'available' && i.addonPrice !== null).sort((a, b) => a.sort - b.sort);
 ---
 <!-- Hero -->
 <section class="hero">
@@ -103,17 +103,40 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
       <a href={orderHref} class="vl-more">{moreText}</a>
     </div>
 
-    <div class="standalone">
-      <img src={seedling.src} width={seedling.w} height={seedling.h} alt="" loading="lazy" class="st-img" />
-      <div>
-        <h3>{t.standalone.title}</h3>
-        <p class="muted">{t.standalone.sub}</p>
+    {standalone.length > 0 && (
+      <div class="standalone" id="standalone">
+        <div class="sa-head">
+          <img src={seedling.src} width={seedling.w} height={seedling.h} alt="" loading="lazy" class="st-img" />
+          <div>
+            <h3>{t.standalone.title}</h3>
+            <p class="muted">{t.standalone.sub}</p>
+          </div>
+        </div>
+        <ul class="sa-grid">
+          {standalone.map((s) => (
+            <li class="sa-card">
+              <div class="sa-media">
+                {productImage('item', s)
+                  ? <img src={productImage('item', s)!} alt="" loading="lazy" width="600" height="450" />
+                  : <span class="sa-icon" aria-hidden="true"><Icon name={s.id === 'planting' ? 'sprout' : s.id === 'cards' ? 'hands' : 'gift'} /></span>}
+                {s.wasAddon && occ && <span class="badge sa-sale">{offLabel(occ, lang)}</span>}
+              </div>
+              <div class="sa-body">
+                <h4>{s.name[lang]}</h4>
+                <p class="sa-desc">{s.desc[lang]}</p>
+                <div class="sa-foot">
+                  <p class="sa-price">
+                    {s.wasAddon && <s class="was-sm"><span class="sr-only">{wasLabel} </span>{money(s.wasAddon, lang)}</s>}
+                    <span>{money(s.addonPrice ?? 0, lang)}</span>
+                  </p>
+                  <a class="btn btn-secondary sa-btn" href={`${orderHref}?only=1&add=${encodeURIComponent(s.id)}`}>{t.standalone.one}<span class="sr-only">: {s.name[lang]}</span></a>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul>
-        {standalone.map((s) => <li>{productImage('item', s) && <img class="sa-img" src={productImage('item', s)!} alt="" loading="lazy" width="48" height="48" />}<span><strong>{s.name[lang]}</strong> {s.wasAddon && <s class="was-sm"><span class="sr-only">{wasLabel} </span>{money(s.wasAddon, lang)}</s>} <span class:list={[s.wasAddon ? 'now' : 'muted']}>{money(s.addonPrice ?? 0, lang)}</span></span></li>)}
-      </ul>
-      <a class="btn btn-secondary" href={`${orderHref}?only=1`}>{t.standalone.cta}</a>
-    </div>
+    )}
   </div>
 </section>
 
@@ -254,13 +277,27 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   .vchip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-white); border: 1px solid var(--color-border); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.95rem; }
   .vchip :global(svg) { width: 16px; height: 16px; color: var(--color-brand); }
   .vl-more { font-weight: 700; color: var(--color-brand); }
-  .standalone { margin-top: var(--space-12); display: grid; grid-template-columns: 200px 1.2fr 1.2fr auto; gap: var(--space-6); align-items: center; background: var(--color-sage); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-8); }
-  .st-img { width: 200px; height: 120px; object-fit: cover; border-radius: var(--radius-md); }
+  .standalone { margin-top: var(--space-12); background: var(--color-sage); border-radius: var(--radius-xl); padding: var(--space-8); }
+  .sa-head { display: flex; align-items: center; gap: var(--space-6); margin-bottom: var(--space-6); }
+  .sa-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+  .sa-card { display: grid; grid-template-columns: 140px 1fr; background: var(--color-white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card); transition: transform .15s, box-shadow .15s; }
+  .sa-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+  .sa-media { position: relative; background: var(--color-rose-soft); min-height: 160px; }
+  .sa-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .sa-icon { position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-brand); }
+  .sa-icon :global(svg) { width: 52px; height: 52px; stroke-width: 1.4; }
+  .sa-sale { position: absolute; top: var(--space-2); inset-inline-start: var(--space-2); background: var(--color-apricot); color: var(--color-brand-dark); font-size: 0.78rem; }
+  .sa-body { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-6); }
+  .sa-body h4 { font-family: var(--font-display); font-size: 1.15rem; color: var(--color-brand-dark); margin: 0; line-height: 1.35; }
+  .sa-desc { color: var(--color-muted); font-size: 0.95rem; margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .sa-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: auto; padding-top: var(--space-2); flex-wrap: wrap; }
+  .sa-price { display: inline-flex; align-items: baseline; gap: var(--space-2); margin: 0; }
+  .sa-price > * { unicode-bidi: isolate; }
+  .sa-price span:not(.sr-only) { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--color-brand-dark); line-height: 1; }
+  .sa-btn { min-height: 44px; padding-inline: var(--space-6); }
+  .st-img { width: 160px; height: 96px; object-fit: cover; border-radius: var(--radius-md); flex: none; }
   .standalone h3 { margin-bottom: var(--space-1); }
   .standalone p { margin: 0; }
-  .standalone ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-  .standalone li { display: flex; align-items: center; gap: var(--space-3); }
-  .sa-img { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: none; }
 
   /* How */
   .how { background: var(--color-white); }
@@ -310,7 +347,6 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
   @media (max-width: 1000px) {
     .steps { grid-template-columns: repeat(2, 1fr); }
     .boxes { grid-template-columns: 1fr; max-width: 520px; margin-inline: auto; }
-    .standalone { grid-template-columns: 1fr; }
   }
   @media (max-width: 760px) {
     .hero-grid { grid-template-columns: 1fr; }
@@ -322,7 +358,12 @@ const standalone = Object.values(items).filter((i) => i.standalone && i.status =
     .g4 { grid-column: span 2; aspect-ratio: 16 / 9; }
     .hb-grid { grid-template-columns: 1fr; text-align: center; justify-items: center; }
     .sp-grid { grid-template-columns: 1fr; }
-    .st-img { width: 100%; height: 140px; }
+    .standalone { padding: var(--space-6) var(--space-4); }
+    .sa-head { flex-direction: column; align-items: stretch; gap: var(--space-4); }
+    .st-img { width: 100%; height: 120px; }
+    .sa-grid { grid-template-columns: 1fr; }
+    .sa-card { grid-template-columns: 110px 1fr; }
+    .sa-body { padding: var(--space-4); }
     .hb-grid .actions { justify-content: center; }
     .tagline { min-height: 0; }
   }

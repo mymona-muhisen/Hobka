@@ -75,6 +75,10 @@ const standalone = (Object.values(items) as SaleItem[]).filter((i) => i.standalo
       <h2>{t.boxes.title}</h2>
       <p>{t.boxes.sub}</p>
     </div>
+    <div class="gift-note">
+      <Icon name="gift" />
+      <p><strong>{t.boxes.giftTitle}</strong><span>{t.boxes.giftText}</span></p>
+    </div>
     <div class="boxes">
       {boxes.map((b) => (
         <article class:list={['box', { popular: b.popular }]}>
@@ -270,6 +274,10 @@ const standalone = (Object.values(items) as SaleItem[]).filter((i) => i.standalo
   .box li :global(svg) { width: 20px; height: 20px; color: var(--color-success); flex: none; margin-top: 4px; }
   .box li.soon { color: var(--color-muted); }
   .box li .badge { margin-inline-start: var(--space-2); font-size: 0.75rem; }
+  .gift-note { display: flex; align-items: center; gap: var(--space-4); max-width: 760px; margin: 0 auto var(--space-8); padding: var(--space-4) var(--space-6); background: var(--color-rose); border-radius: var(--radius-xl); color: var(--color-brand-dark); }
+  .gift-note :global(svg) { width: 36px; height: 36px; flex: none; color: var(--color-brand); }
+  .gift-note p { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+  .gift-note strong { font-size: 1.1rem; color: var(--color-brand); }
   .timeline { display: flex; justify-content: center; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; color: var(--color-brand-dark); font-weight: 500; text-align: center; }
   .timeline :global(svg) { width: 20px; height: 20px; flex: none; color: var(--color-brand); }
   .values-line { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2); margin: var(--space-8) auto 0; max-width: 900px; }
